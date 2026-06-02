@@ -1,73 +1,94 @@
-# React + TypeScript + Vite
+# 🐟 OceanEyes Web: AI Fish Monitoring & Aquarium Diagnostics Portal
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+OceanEyes Web is a modern, high-performance web dashboard designed to monitor smart aquariums in real-time. The application provides advanced diagnostics (pH, temperature, water clarity, chemical balances) alongside active computer vision feeds that count, classify, and track fish species in real-time.
 
-Currently, two official plugins are available:
+---
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## 🚀 Key Features
 
-## React Compiler
+*   **Real-Time Diagnostics Panel**: High-fidelity monitoring of critical aquarium health indicators (pH, temperature, clarity, and chemistry metrics).
+*   **AI Fish Detection & Classification**: Automated integration with computer vision models to count live fish, classify species (e.g., Neon Tetra, Guppy, Corydoras), and calculate inference confidence scores.
+*   **IoT Simulator Console**: Split-screen simulator enabling developers and operators to mock data streams, inject anomalies, and verify dashboard telemetry instantly.
+*   **Premium Web-Native Design**: Tailored responsive full-screen grid built with native Vanilla CSS, using a curated HSL color palette, smooth transitions, and sleek glassmorphism effects.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+---
 
-## Expanding the ESLint configuration
+## 🛠️ Technology Stack
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+*   **Frontend Library**: React 18+ (TypeScript)
+*   **Build System & HMR**: Vite
+*   **Styling**: Vanilla CSS (CSS Custom Variables with HSL colors)
+*   **Iconography**: Lucide React (`lucide-react`)
+*   **Datastore/Mocking**: LocalStorage-backed simulation model (`src/services/mock_service.ts`) emulating real-time Firestore synchronization.
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+---
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+## 📂 Directory Scaffolding
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```text
+C:\Hope\Project\Ocean-eyes-web/
+├── .agents/                 # AI Agent workflows, skills, and configurations
+│   └── skills/
+│       ├── planner/         # Task decomposition guidelines
+│       └── code-reviewer/   # Linting, naming conventions, and modularity rules
+├── public/                  # Static assets & favicons
+├── src/
+│   ├── assets/              # SVGs, images, local media
+│   ├── context/             # AppContext React providers & state managers
+│   ├── pages/
+│   │   ├── ViewerApp.tsx    # Customer dashboard views (Home, Live cam, Analytics)
+│   │   └── IoTMonitor.tsx   # IoT Scanner Console (Simulator workspace)
+│   ├── services/
+│   │   └── mock_service.ts  # Datastore & local mock state managers
+│   ├── App.tsx              # Sidebar dashboard layout entry point
+│   ├── index.css            # Premium CSS variable design system
+│   └── main.tsx             # DOM bootstrapper & entry script
+├── .gitignore
+├── AGENTS.md                # Project architecture & AI conventions guide
+└── package.json             # NPM dependencies & manifest
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+---
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+## ⚙️ Operational Commands
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+Run the following commands in the project root to install, develop, lint, or build the application:
+
+### 1. Installation
+Install project dependencies:
+```bash
+npm install
 ```
+
+### 2. Local Development
+Launch the local Vite development server with hot module reloading (HMR):
+```bash
+npm run dev
+```
+
+### 3. Verification & Linting
+Validate type conventions and syntax consistency:
+```bash
+npm run lint
+```
+
+### 4. Build Compilation
+Compile, optimize, and bundle the application into static assets for production deployment:
+```bash
+npm run build
+```
+
+---
+
+## 🤖 Custom AI Agent Tooling
+
+This project integrates specialized AI assistant skills located inside the `.agents/` folder. Developers or AI assistants can invoke these tools during pair programming sessions:
+
+### Code Review & Health Scanner
+An automated static analysis scanner checks for file complexity, TypeScript `any` leaks, naming conventions, hardcoded secrets, and async error boundaries.
+
+To execute a codebase health scan:
+```bash
+node .agents/skills/code-reviewer/scripts/code_health_checker.cjs
+```
+This utility returns details on file scale, component naming patterns, type-safety degradation, and security vulnerabilities.
