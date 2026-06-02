@@ -69,7 +69,8 @@ interface ScreenProps {
 }
 
 const MonitorWelcomeScreen: React.FC<ScreenProps> = ({ onNavigate }) => {
-  const { tankId, activeTank } = useApp();
+  const { tankId, activeTank: contextActiveTank, tanks } = useApp();
+  const activeTank = contextActiveTank || (tanks.length > 0 ? tanks[0] : null);
 
   return (
     <div style={{
@@ -104,18 +105,18 @@ const MonitorWelcomeScreen: React.FC<ScreenProps> = ({ onNavigate }) => {
       </p>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', width: '100%', maxWidth: '280px' }}>
-        {tankId ? (
+        <button 
+          className="primary-button" 
+          style={{ width: '100%', padding: '14px', borderRadius: '12px' }}
+          onClick={() => onNavigate('active')}
+        >
+          {tankId ? 'Open Live Camera Monitor' : 'Open Live Camera Monitor (Demo Mode)'}
+        </button>
+
+        {!tankId && (
           <button 
             className="primary-button" 
-            style={{ width: '100%', padding: '14px', borderRadius: '12px' }}
-            onClick={() => onNavigate('active')}
-          >
-            Open Live Camera Monitor
-          </button>
-        ) : (
-          <button 
-            className="primary-button" 
-            style={{ width: '100%', padding: '14px', borderRadius: '12px' }}
+            style={{ width: '100%', padding: '14px', borderRadius: '12px', backgroundColor: '#1E293B', color: '#E2E8F0', border: '1px solid #334155' }}
             onClick={() => onNavigate('qr')}
           >
             Pair with Mobile App
@@ -133,7 +134,7 @@ const MonitorWelcomeScreen: React.FC<ScreenProps> = ({ onNavigate }) => {
 
       {activeTank && (
         <div style={{ marginTop: '40px', fontSize: '12px', color: '#64748B' }}>
-          Linked to: <strong>{activeTank.name}</strong>
+          Linked Tank: <strong>{activeTank.name}</strong> {!tankId && <span style={{ color: 'var(--color-warning)', marginLeft: '4px' }}>(Unpaired Demo)</span>}
         </div>
       )}
     </div>
@@ -217,7 +218,8 @@ const MonitorQrDisplayScreen: React.FC<ScreenProps> = ({ onNavigate }) => {
 
 // ─── Calibration Screen (calibration_screen.dart equivalent) ───
 const MonitorCalibrationScreen: React.FC<ScreenProps> = ({ onNavigate }) => {
-  const { activeTank, updateCalibration } = useApp();
+  const { activeTank: contextActiveTank, tanks, updateCalibration } = useApp();
+  const activeTank = contextActiveTank || (tanks.length > 0 ? tanks[0] : null);
   const [lineY, setLineY] = useState(activeTank?.calibration?.water_line_y || 120);
   const [saved, setSaved] = useState(false);
 
@@ -236,12 +238,14 @@ const MonitorCalibrationScreen: React.FC<ScreenProps> = ({ onNavigate }) => {
   };
 
   const handleSave = () => {
-    updateCalibration(lineY);
-    setSaved(true);
-    setTimeout(() => {
-      setSaved(false);
-      onNavigate('welcome');
-    }, 1500);
+    if (activeTank) {
+      updateCalibration(lineY);
+      setSaved(true);
+      setTimeout(() => {
+        setSaved(false);
+        onNavigate('welcome');
+      }, 1500);
+    }
   };
 
   return (
@@ -253,9 +257,14 @@ const MonitorCalibrationScreen: React.FC<ScreenProps> = ({ onNavigate }) => {
       color: '#FFFFFF',
       background: '#090D11'
     }}>
-      <h3 style={{ fontSize: '16px', fontWeight: 700, marginBottom: '8px', color: '#E2E8F0', textAlign: 'center' }}>
+      <h3 style={{ fontSize: '16px', fontWeight: 700, marginBottom: '2px', color: '#E2E8F0', textAlign: 'center' }}>
         Water Line Calibration
       </h3>
+      {activeTank && (
+        <span style={{ fontSize: '11px', color: 'var(--color-primary)', display: 'block', textAlign: 'center', marginBottom: '8px', fontWeight: 600 }}>
+          Calibrating: {activeTank.name}
+        </span>
+      )}
       <p style={{ fontSize: '11px', color: '#64748B', textAlign: 'center', marginBottom: '16px', lineHeight: '135%' }}>
         Drag the dotted red line visually to match the physical water surface level in your tank.
       </p>
@@ -269,7 +278,7 @@ const MonitorCalibrationScreen: React.FC<ScreenProps> = ({ onNavigate }) => {
         onTouchMove={handleDrag}
         style={{
           flex: 1,
-          background: 'linear-gradient(180deg, #111827 0%, #115E59 100%)',
+          background: 'radial-gradient(circle at center, #1E293B 0%, #0F172A 100%)',
           borderRadius: '12px',
           border: '2px solid #1E293B',
           position: 'relative',
@@ -282,9 +291,59 @@ const MonitorCalibrationScreen: React.FC<ScreenProps> = ({ onNavigate }) => {
       >
         <div className="camera-grid" />
         
-        {/* Floating elements inside canvas */}
-        <span style={{ fontSize: '48px', opacity: 0.1, position: 'absolute', top: '10%' }}>🐟</span>
-        <span style={{ fontSize: '32px', opacity: 0.1, position: 'absolute', bottom: '15%' }}>🐠</span>
+        {/* Dynamic Water Body Representation of Tank */}
+        <div style={{
+          position: 'absolute',
+          bottom: 0,
+          left: 0,
+          width: '100%',
+          height: `${240 - lineY}px`,
+          background: 'linear-gradient(180deg, rgba(20, 184, 166, 0.35) 0%, rgba(13, 148, 136, 0.55) 100%)',
+          borderTop: '2px solid rgba(255, 255, 255, 0.5)',
+          zIndex: 1,
+          pointerEvents: 'none',
+          transition: 'height 0.05s ease-out'
+        }}>
+          {/* Bubbles */}
+          <div style={{ position: 'absolute', bottom: '15%', left: '20%', fontSize: '14px', opacity: 0.3 }} className="anim-float-1">🫧</div>
+          <div style={{ position: 'absolute', bottom: '45%', right: '15%', fontSize: '12px', opacity: 0.2 }} className="anim-float-2">🫧</div>
+          <div style={{ position: 'absolute', bottom: '70%', left: '50%', fontSize: '16px', opacity: 0.4 }} className="anim-float-1">🫧</div>
+
+          {/* Swimming fish inside water */}
+          <span style={{ fontSize: '32px', position: 'absolute', bottom: '30%', left: '20%', opacity: 0.65 }} className="anim-float-1">🐟</span>
+          <span style={{ fontSize: '28px', position: 'absolute', bottom: '50%', right: '20%', opacity: 0.65 }} className="anim-float-2">🐠</span>
+        </div>
+
+        {/* Sand/Substrate Bed */}
+        <div style={{
+          position: 'absolute',
+          bottom: 0,
+          left: 0,
+          width: '100%',
+          height: '24px',
+          background: 'linear-gradient(0deg, #0F172A 0%, #1E293B 100%)',
+          borderTop: '1px solid #334155',
+          zIndex: 2,
+          pointerEvents: 'none'
+        }} />
+
+        {/* Aquatic Plants */}
+        <div style={{ position: 'absolute', bottom: '22px', left: '6%', fontSize: '26px', zIndex: 3, opacity: 0.7 }} className="anim-float-1">🌿</div>
+        <div style={{ position: 'absolute', bottom: '22px', right: '8%', fontSize: '28px', zIndex: 3, opacity: 0.6 }} className="anim-float-2">🍀</div>
+
+        {/* Glass Tank Frame Reflection */}
+        <div style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100%',
+          boxShadow: 'inset 0 0 20px rgba(45, 212, 191, 0.15)',
+          border: '2px solid rgba(45, 212, 191, 0.25)',
+          borderRadius: '10px',
+          pointerEvents: 'none',
+          zIndex: 15
+        }} />
 
         {/* Dynamic Water Level Line Indicator */}
         <div style={{
@@ -296,33 +355,34 @@ const MonitorCalibrationScreen: React.FC<ScreenProps> = ({ onNavigate }) => {
           borderTop: '2px dashed var(--color-critical)',
           zIndex: 10,
           display: 'flex',
-          justifyContent: 'center'
-        }}>
-          <span style={{
-            position: 'absolute',
-            top: '-18px',
-            fontSize: '9px',
-            color: '#FFFFFF',
-            background: 'var(--color-critical)',
-            padding: '2px 8px',
-            borderRadius: '4px',
-            fontWeight: 700,
-            boxShadow: '0 2px 6px rgba(239, 68, 68, 0.4)'
-          }}>
-            SET: {Math.round(lineY)}px
-          </span>
-        </div>
+          justifyContent: 'center',
+          pointerEvents: 'none'
+        }} />
 
-        <span style={{ fontSize: '12px', color: '#334155', fontWeight: 600, pointerEvents: 'none' }}>
-          DRAG TO MATCH WATER LEVEL
-        </span>
+        {/* Water Level Label */}
+        <div style={{
+          position: 'absolute',
+          top: `${lineY - 10}px`,
+          right: '10px',
+          fontSize: '9px',
+          background: 'var(--color-critical)',
+          color: '#FFF',
+          padding: '2px 6px',
+          borderRadius: '4px',
+          fontWeight: 600,
+          zIndex: 12,
+          pointerEvents: 'none'
+        }}>
+          DRAG TO WATER LINE ({Math.round(((240 - lineY) / 240) * 100)}%)
+        </div>
       </div>
 
-      <div style={{ display: 'flex', gap: '12px', marginTop: '16px' }}>
+      <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
         <button 
           className="primary-button" 
           style={{ flex: 1, padding: '12px', borderRadius: '12px' }}
           onClick={handleSave}
+          disabled={!activeTank}
         >
           {saved ? '✓ Calibration Saved' : 'Confirm Level'}
         </button>
@@ -340,7 +400,8 @@ const MonitorCalibrationScreen: React.FC<ScreenProps> = ({ onNavigate }) => {
 
 // ─── Active Monitoring Screen (monitoring_screen.dart equivalent) ───
 const ActiveMonitoringScreen: React.FC<ScreenProps> = ({ onNavigate }) => {
-  const { activeTank, readings, fishList } = useApp();
+  const { activeTank: contextActiveTank, tanks, readings, fishList } = useApp();
+  const activeTank = contextActiveTank || (tanks.length > 0 ? tanks[0] : null);
   const [simClarityIssue, setSimClarityIssue] = useState(false);
   const [simFishHiding, setSimFishHiding] = useState(false);
 
@@ -418,6 +479,8 @@ const ActiveMonitoringScreen: React.FC<ScreenProps> = ({ onNavigate }) => {
     }
   };
 
+  const waterHeightPct = activeTank?.calibration ? Math.min(95, Math.max(5, ((240 - activeTank.calibration.water_line_y) / 240) * 100)) : 50;
+
   return (
     <div style={{
       padding: '16px',
@@ -427,6 +490,15 @@ const ActiveMonitoringScreen: React.FC<ScreenProps> = ({ onNavigate }) => {
       color: '#FFFFFF',
       background: '#090D11'
     }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+        <span style={{ fontSize: '11px', color: '#94A3B8', fontWeight: 600 }}>Active Stream Feed</span>
+        {activeTank && (
+          <span style={{ fontSize: '11px', color: 'var(--color-primary)', fontWeight: 600 }}>
+            {activeTank.name}
+          </span>
+        )}
+      </div>
+
       {/* Live aquatic scanner simulation */}
       <div style={{
         flex: 1,
@@ -434,11 +506,60 @@ const ActiveMonitoringScreen: React.FC<ScreenProps> = ({ onNavigate }) => {
         border: '1px solid #1E293B',
         position: 'relative',
         overflow: 'hidden',
-        background: 'linear-gradient(180deg, #115E59 0%, #134E4A 100%)',
+        background: 'radial-gradient(circle at center, #1E293B 0%, #0F172A 100%)',
         marginBottom: '16px'
       }}>
         <div className="camera-grid" />
         <div className="camera-scanline" />
+
+        {/* Visual Water Body Representation of Tank */}
+        <div style={{
+          position: 'absolute',
+          bottom: 0,
+          left: 0,
+          width: '100%',
+          height: `${waterHeightPct}%`,
+          background: 'linear-gradient(180deg, rgba(20, 184, 166, 0.3) 0%, rgba(13, 148, 136, 0.5) 100%)',
+          borderTop: '2px dashed rgba(255, 255, 255, 0.4)',
+          zIndex: 1,
+          pointerEvents: 'none'
+        }}>
+          {/* Bubbles */}
+          <div style={{ position: 'absolute', bottom: '15%', left: '20%', fontSize: '12px', opacity: 0.3 }} className="anim-float-1">🫧</div>
+          <div style={{ position: 'absolute', bottom: '45%', right: '15%', fontSize: '10px', opacity: 0.2 }} className="anim-float-2">🫧</div>
+          <div style={{ position: 'absolute', bottom: '70%', left: '50%', fontSize: '14px', opacity: 0.4 }} className="anim-float-1">🫧</div>
+        </div>
+
+        {/* Sand/Substrate Bed */}
+        <div style={{
+          position: 'absolute',
+          bottom: 0,
+          left: 0,
+          width: '100%',
+          height: '20px',
+          background: 'linear-gradient(0deg, #0F172A 0%, #1E293B 100%)',
+          borderTop: '1px solid #334155',
+          zIndex: 2,
+          pointerEvents: 'none'
+        }} />
+
+        {/* Aquatic Plants */}
+        <div style={{ position: 'absolute', bottom: '18px', left: '5%', fontSize: '24px', zIndex: 3, opacity: 0.7 }} className="anim-float-1">🌿</div>
+        <div style={{ position: 'absolute', bottom: '18px', right: '8%', fontSize: '28px', zIndex: 3, opacity: 0.6 }} className="anim-float-2">🍀</div>
+
+        {/* Glass Tank Frame Reflection */}
+        <div style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100%',
+          boxShadow: 'inset 0 0 20px rgba(56, 189, 248, 0.15)',
+          border: '2px solid rgba(56, 189, 248, 0.25)',
+          borderRadius: '8px',
+          pointerEvents: 'none',
+          zIndex: 15
+        }} />
 
         {/* Live scanner target graphics */}
         <div style={{
@@ -449,7 +570,8 @@ const ActiveMonitoringScreen: React.FC<ScreenProps> = ({ onNavigate }) => {
           fontSize: '9px',
           color: '#34D399',
           lineHeight: '130%',
-          textShadow: '0 0 4px rgba(52, 211, 153, 0.4)'
+          textShadow: '0 0 4px rgba(52, 211, 153, 0.4)',
+          zIndex: 12
         }}>
           <span>CAM FEED: OK</span><br />
           <span>RESOLUTION: 1080P</span><br />
@@ -464,7 +586,8 @@ const ActiveMonitoringScreen: React.FC<ScreenProps> = ({ onNavigate }) => {
           width: '80px',
           height: '60px',
           border: '1.5px solid #34D399',
-          boxShadow: '0 0 6px rgba(52, 211, 153, 0.3)'
+          boxShadow: '0 0 6px rgba(52, 211, 153, 0.3)',
+          zIndex: 12
         }}>
           <span style={{ position: 'absolute', top: '-14px', left: 0, fontSize: '8px', color: '#FFF', background: '#34D399', padding: '1px 3px', fontWeight: 700 }}>
             NEON TETRA 98%
@@ -478,7 +601,8 @@ const ActiveMonitoringScreen: React.FC<ScreenProps> = ({ onNavigate }) => {
           width: '70px',
           height: '50px',
           border: '1.5px solid #34D399',
-          boxShadow: '0 0 6px rgba(52, 211, 153, 0.3)'
+          boxShadow: '0 0 6px rgba(52, 211, 153, 0.3)',
+          zIndex: 12
         }}>
           <span style={{ position: 'absolute', top: '-14px', left: 0, fontSize: '8px', color: '#FFF', background: '#34D399', padding: '1px 3px', fontWeight: 700 }}>
             GUPPY 94%
@@ -487,13 +611,15 @@ const ActiveMonitoringScreen: React.FC<ScreenProps> = ({ onNavigate }) => {
 
         {/* Swimming fish inside canvas */}
         {!simFishHiding ? (
-          <>
+          <div style={{ zIndex: 5, position: 'absolute', width: '100%', height: '100%', pointerEvents: 'none' }}>
             <span style={{ fontSize: '32px', position: 'absolute', top: '35%', left: '30%' }} className="anim-float-1">🐟</span>
             <span style={{ fontSize: '28px', position: 'absolute', top: '55%', right: '25%' }} className="anim-float-2">🐠</span>
             <span style={{ fontSize: '36px', position: 'absolute', bottom: '30%', left: '40%' }} className="anim-float-2">🐡</span>
-          </>
+          </div>
         ) : (
-          <span style={{ fontSize: '28px', position: 'absolute', top: '55%', right: '25%' }} className="anim-float-2">🐠</span>
+          <div style={{ zIndex: 5, position: 'absolute', width: '100%', height: '100%', pointerEvents: 'none' }}>
+            <span style={{ fontSize: '28px', position: 'absolute', top: '55%', right: '25%' }} className="anim-float-2">🐠</span>
+          </div>
         )}
 
         {/* Dynamic Water Line Calibration Overlay */}
@@ -505,7 +631,8 @@ const ActiveMonitoringScreen: React.FC<ScreenProps> = ({ onNavigate }) => {
             width: '100%',
             height: '2px',
             borderTop: '2px dashed rgba(255,255,255,0.3)',
-            zIndex: 10
+            zIndex: 10,
+            pointerEvents: 'none'
           }} />
         )}
       </div>
