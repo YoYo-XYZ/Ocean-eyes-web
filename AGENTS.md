@@ -27,7 +27,7 @@ Our new objectives are:
 
 ### 📂 Directory Scaffolding
 ```text
-C:\Hope\Project\Ocena-eyes-web/
+C:\Hope\Project\Ocean-eyes-web/
 ├── .agents/                 # Workspace agent skills and configurations
 ├── public/                  # Static assets & icons
 ├── src/
