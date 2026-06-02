@@ -286,7 +286,7 @@ const MonitorCalibrationScreen: React.FC<ScreenProps> = ({ onNavigate }) => {
         onMouseDown={handleDrag}
         onTouchMove={handleDrag}
         style={{
-          flex: 1,
+          height: '240px', // Matches exactly the 240px coordinate space to prevent stretching/floating gaps at the bottom
           background: 'radial-gradient(circle at center, #1E293B 0%, #0F172A 100%)',
           borderRadius: '12px',
           border: '2px solid #1E293B',
