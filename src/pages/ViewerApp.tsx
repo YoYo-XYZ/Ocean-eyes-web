@@ -974,11 +974,11 @@ const HistoryDetailScreen: React.FC = () => {
   const drawClarityChart = () => {
     if (readings.length === 0) return null;
     const history = [...readings].reverse().slice(-7); // Reverse so oldest is left, last 7 entries
-    const width = 310;
-    const height = 120;
+    const width = 800; // Expanded logical width for a premium widescreen layout
+    const height = 180; // Expanded logical height for high detail on desktop
     const maxVal = 10;
     const minVal = 0;
-    const padding = 15;
+    const padding = 25; // Adjusted padding for balance
     
     const points = history.map((r, idx) => {
       const x = padding + (idx * (width - 2 * padding) / (history.length - 1));
@@ -992,7 +992,7 @@ const HistoryDetailScreen: React.FC = () => {
     const areaPoints = `${points[0].x},${height - padding} ${polylinePoints} ${points[points.length - 1].x},${height - padding}`;
 
     return (
-      <svg width="100%" height={height} viewBox={`0 0 ${width} ${height}`} style={{ overflow: 'visible' }}>
+      <svg width="100%" height={height} viewBox={`0 0 ${width} ${height}`} style={{ overflow: 'visible', width: '100%', display: 'block' }}>
         <defs>
           <linearGradient id="chartGrad" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="var(--color-info)" stopOpacity="0.3" />
@@ -1013,8 +1013,8 @@ const HistoryDetailScreen: React.FC = () => {
         {/* Data points dots */}
         {points.map((p, idx) => (
           <g key={idx}>
-            <circle cx={p.x} cy={p.y} r="4" fill="var(--color-info)" stroke="#FFFFFF" strokeWidth="2" />
-            <text x={p.x} y={p.y - 8} fontSize="8" fontWeight="600" textAnchor="middle" fill="var(--color-text-primary)">
+            <circle cx={p.x} cy={p.y} r="5" fill="var(--color-info)" stroke="#FFFFFF" strokeWidth="2.5" />
+            <text x={p.x} y={p.y - 10} fontSize="10" fontWeight="700" textAnchor="middle" fill="var(--color-text-primary)">
               {p.clarity}
             </text>
           </g>
@@ -1045,7 +1045,7 @@ const HistoryDetailScreen: React.FC = () => {
           </span>
         </h3>
         
-        <div style={{ width: '100%', display: 'flex', justifyContent: 'center', padding: '10px 0' }}>
+        <div style={{ width: '100%', padding: '10px 0' }}>
           {drawClarityChart()}
         </div>
         
