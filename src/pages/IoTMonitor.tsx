@@ -231,6 +231,7 @@ const MonitorCalibrationScreen: React.FC<ScreenProps> = ({ onNavigate }) => {
   const activeTank = contextActiveTank || (tanks.length > 0 ? tanks[0] : null);
   const [lineY, setLineY] = useState(activeTank?.calibration?.water_line_y || 120);
   const [saved, setSaved] = useState(false);
+  const staticWaterLineY = activeTank?.calibration?.water_line_y || 120; // Static camera feed reference
 
   const handleDrag = (e: React.MouseEvent<HTMLDivElement> | React.TouchEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
@@ -300,18 +301,17 @@ const MonitorCalibrationScreen: React.FC<ScreenProps> = ({ onNavigate }) => {
       >
         <div className="camera-grid" />
         
-        {/* Dynamic Water Body Representation of Tank */}
+        {/* Static Water Body Representation of Tank (Simulating Camera Feed) */}
         <div style={{
           position: 'absolute',
           bottom: 0,
           left: 0,
           width: '100%',
-          height: `${240 - lineY}px`,
+          height: `${240 - staticWaterLineY}px`, // Static camera feed height
           background: 'linear-gradient(180deg, rgba(20, 184, 166, 0.35) 0%, rgba(13, 148, 136, 0.55) 100%)',
           borderTop: '2px solid rgba(255, 255, 255, 0.5)',
           zIndex: 1,
-          pointerEvents: 'none',
-          transition: 'height 0.05s ease-out'
+          pointerEvents: 'none'
         }}>
           {/* Bubbles */}
           <div style={{ position: 'absolute', bottom: '15%', left: '20%', fontSize: '14px', opacity: 0.3 }} className="anim-float-1">🫧</div>
