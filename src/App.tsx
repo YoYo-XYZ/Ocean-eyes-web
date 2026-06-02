@@ -1,0 +1,208 @@
+// App.tsx - Full-Screen Desktop Dashboard Playground Coordinator
+import React from 'react';
+import { AppProvider, useApp } from './context/AppContext';
+import { ViewerApp } from './pages/ViewerApp';
+import { IoTMonitor } from './pages/IoTMonitor';
+import { 
+  Home, 
+  Video, 
+  Settings, 
+  Activity, 
+  Plus, 
+  Cpu, 
+  RefreshCw
+} from 'lucide-react';
+
+const OceanEyesDashboard: React.FC = () => {
+  const { 
+    activeTab, 
+    setActiveTab, 
+    tankId, 
+    activeTank, 
+    alerts, 
+    simulationActive, 
+    setSimulationActive, 
+    triggerManualReading 
+  } = useApp();
+
+  const activeAlertCount = alerts.filter(a => !a.resolved).length;
+
+  return (
+    <div className="dashboard-wrapper">
+      {/* ─── Sidebar Navigation ─── */}
+      <aside className="sidebar">
+        <div className="sidebar-header">
+          <div className="sidebar-logo">
+            <span>🌊</span>
+            <span style={{ fontFamily: 'var(--font-main)', letterSpacing: '-0.03em' }}>OceanEyes</span>
+          </div>
+        </div>
+
+        {/* Linked Tank Brief Info Card */}
+        {activeTank && (
+          <div style={{
+            background: 'var(--color-background)',
+            padding: '16px',
+            borderRadius: '16px',
+            border: '1px solid var(--color-border)'
+          }}>
+            <span style={{ fontSize: '10px', color: 'var(--color-text-secondary)', display: 'block', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              Connected Unit
+            </span>
+            <strong style={{ fontSize: '15px', color: 'var(--color-text-primary)', display: 'block', marginTop: '2px' }}>
+              {activeTank.name}
+            </strong>
+            <code style={{ fontSize: '10px', color: 'var(--color-primary-dark)', display: 'block', marginTop: '4px' }}>
+              {activeTank.id}
+            </code>
+          </div>
+        )}
+
+        {/* Navigation Sidebar Links */}
+        <nav className="sidebar-menu">
+          <button 
+            className={`sidebar-link ${activeTab === 'home' ? 'active' : ''}`}
+            onClick={() => setActiveTab('home')}
+          >
+            <Home size={18} />
+            <span>Dashboard</span>
+          </button>
+
+          <button 
+            className={`sidebar-link ${activeTab === 'live' ? 'active' : ''}`}
+            onClick={() => setActiveTab('live')}
+          >
+            <Video size={18} />
+            <span>Live Video Feed</span>
+          </button>
+
+          <button 
+            className={`sidebar-link ${activeTab === 'history' ? 'active' : ''}`}
+            onClick={() => setActiveTab('history')}
+          >
+            <Activity size={18} />
+            <span>Clarity Analytics</span>
+          </button>
+
+          <button 
+            className={`sidebar-link ${activeTab === 'my_fish' ? 'active' : ''}`}
+            onClick={() => setActiveTab('my_fish')}
+          >
+            <Plus size={18} />
+            <span>Fish Inventory</span>
+          </button>
+
+          <button 
+            className={`sidebar-link ${activeTab === 'settings' || activeTab === 'alerts' ? 'active' : ''}`}
+            onClick={() => setActiveTab('settings')}
+          >
+            <Settings size={18} />
+            <span>Tank Boundaries</span>
+            {activeAlertCount > 0 && (
+              <span style={{
+                marginLeft: 'auto',
+                backgroundColor: 'var(--color-critical)',
+                color: '#FFF',
+                fontSize: '10px',
+                padding: '2px 6px',
+                borderRadius: '10px',
+                fontWeight: 700
+              }}>
+                {activeAlertCount}
+              </span>
+            )}
+          </button>
+
+          {/* IoT Tank Simulator Console replaces the hard monitor mockup device frame! */}
+          <div style={{ margin: '12px 0 6px 0', height: '1px', backgroundColor: 'var(--color-border)' }} />
+          
+          <button 
+            className={`sidebar-link ${activeTab === 'monitor' ? 'active' : ''}`}
+            onClick={() => setActiveTab('monitor')}
+            style={{ 
+              backgroundColor: activeTab === 'monitor' ? 'rgba(13, 148, 136, 0.1)' : 'rgba(0,0,0,0.01)',
+              border: '1px dashed rgba(13, 148, 136, 0.25)' 
+            }}
+          >
+            <Cpu size={18} style={{ color: 'var(--color-primary)' }} />
+            <span style={{ color: 'var(--color-primary-dark)' }}>IoT Scanner Console</span>
+          </button>
+        </nav>
+
+        {/* Global Simulation Controller */}
+        <div style={{ 
+          marginTop: 'auto', 
+          display: 'flex', 
+          flexDirection: 'column', 
+          gap: '12px',
+          paddingTop: '16px',
+          borderTop: '1px solid var(--color-border)'
+        }}>
+          <button 
+            className="secondary-button" 
+            style={{ 
+              width: '100%',
+              padding: '10px', 
+              fontSize: '12px', 
+              borderRadius: '10px', 
+              backgroundColor: simulationActive ? 'rgba(16, 185, 129, 0.08)' : 'transparent',
+              borderColor: simulationActive ? 'var(--color-good)' : 'var(--color-border)',
+              color: simulationActive ? 'var(--color-good)' : 'var(--color-text-secondary)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '6px'
+            }}
+            onClick={() => setSimulationActive(!simulationActive)}
+          >
+            <RefreshCw size={12} className={simulationActive ? 'anim-float-1' : ''} />
+            <span>{simulationActive ? 'Simulator Active' : 'Simulator Idle'}</span>
+          </button>
+
+          <button 
+            className="primary-button" 
+            style={{ width: '100%', padding: '10px', fontSize: '12px', borderRadius: '10px', boxShadow: 'none' }}
+            onClick={triggerManualReading}
+          >
+            Scan Metrics Now
+          </button>
+        </div>
+      </aside>
+
+      {/* ─── Main Content Canvas ─── */}
+      <main className="main-canvas">
+        {/* Under onboarding check */}
+        {tankId === null && activeTab !== 'monitor' ? (
+          <div className="card-decoration" style={{ maxWidth: '480px', margin: '40px auto 0 auto', padding: '40px' }}>
+            <ViewerApp />
+          </div>
+        ) : activeTab === 'monitor' ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div className="canvas-header">
+              <div>
+                <span style={{ fontSize: '12px', color: 'var(--color-text-secondary)', fontWeight: 600, textTransform: 'uppercase' }}>Hardware Unit</span>
+                <h1 className="canvas-title">Aquarium Smart Scanner Console</h1>
+              </div>
+            </div>
+            
+            <div className="card-decoration" style={{ padding: '8px', maxWidth: '800px', margin: '0 auto', width: '100%' }}>
+              <IoTMonitor />
+            </div>
+          </div>
+        ) : (
+          <ViewerApp />
+        )}
+      </main>
+    </div>
+  );
+};
+
+const App: React.FC = () => {
+  return (
+    <AppProvider>
+      <OceanEyesDashboard />
+    </AppProvider>
+  );
+};
+
+export default App;
