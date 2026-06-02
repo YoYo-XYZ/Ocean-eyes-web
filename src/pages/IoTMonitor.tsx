@@ -25,7 +25,16 @@ export const IoTMonitor: React.FC = () => {
   };
 
   return (
-    <div className="monitor-screen">
+    <div className="monitor-screen" style={{
+      display: 'flex',
+      flexDirection: 'column',
+      height: '520px', // Fixed high fidelity panel height to simulate a hardware tablet unit
+      width: '100%',
+      background: '#090D11',
+      borderRadius: '12px',
+      overflow: 'hidden',
+      border: '1px solid #1E293B'
+    }}>
       {/* Device Header Bar */}
       <div style={{
         height: '42px',
