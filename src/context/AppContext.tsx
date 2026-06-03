@@ -2,7 +2,7 @@
 // AppContext.tsx - Global State Context for OceanEyes
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { MockFirestore, subscribeToDb } from '../services/mock_service';
-import type { TankBrief, FishEntry, ReadingItem, AlertItem, LiveState } from '../services/mock_service';
+import type { TankBrief, FishEntry, ReadingItem, AlertItem, LiveState } from '../types/aquarium';
 
 export type AppMode = 'viewer' | 'monitor' | 'both';
 export type ViewerTab = 'home' | 'live' | 'settings' | 'alerts' | 'history' | 'my_fish' | 'monitor';
