@@ -15,7 +15,9 @@ import {
   RefreshCw, 
   Cpu, 
   Download, 
-  Trash2 
+  Trash2,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 
 const DEFAULT_PRESETS: FilterPreset[] = [
@@ -75,6 +77,7 @@ export const LiveScreen: React.FC = () => {
   });
 
   const [selectedPresetId, setSelectedPresetId] = useState<string>('normal');
+  const [isAdjustmentsExpanded, setIsAdjustmentsExpanded] = useState(false);
   const [newPresetName, setNewPresetName] = useState('');
   const [showSavePresetInput, setShowSavePresetInput] = useState(false);
 
@@ -1064,12 +1067,48 @@ Diagnostics:
 
       {/* Stream Image Adjustments Card */}
       {isStreaming && !isGridView && (
-        <div className="card-decoration" style={{ padding: '24px', marginBottom: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          <h3 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--color-text-primary)', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span>🎨 Stream Image Adjustments</span>
-          </h3>
+        <div className="card-decoration" style={{ 
+          padding: isAdjustmentsExpanded ? '24px' : '16px 24px', 
+          marginBottom: '24px', 
+          display: 'flex', 
+          flexDirection: 'column', 
+          gap: isAdjustmentsExpanded ? '20px' : '0px'
+        }}>
+          <div 
+            style={{ 
+              display: 'flex', 
+              justifyContent: 'space-between', 
+              alignItems: 'center', 
+              cursor: 'pointer',
+              userSelect: 'none'
+            }}
+            onClick={() => setIsAdjustmentsExpanded(!isAdjustmentsExpanded)}
+          >
+            <h3 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--color-text-primary)', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span>🎨 Stream Image Adjustments</span>
+              {!isAdjustmentsExpanded && selectedPresetId !== 'normal' && (
+                <span style={{ 
+                  fontSize: '11px', 
+                  fontWeight: 500, 
+                  background: 'var(--color-primary-light)', 
+                  color: 'var(--color-primary-dark)', 
+                  padding: '2px 8px', 
+                  borderRadius: '12px',
+                  marginLeft: '8px'
+                }}>
+                  Active: {
+                    [...DEFAULT_PRESETS, ...customPresets].find(p => p.id === selectedPresetId)?.name || 'Custom'
+                  }
+                </span>
+              )}
+            </h3>
+            <div style={{ display: 'flex', alignItems: 'center', color: 'var(--color-text-secondary)' }}>
+              {isAdjustmentsExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+            </div>
+          </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '24px' }}>
+          {isAdjustmentsExpanded && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '24px' }}>
             {/* Left Column - Adjustment Sliders */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <h4 style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text-secondary)', margin: 0, borderBottom: '1px solid var(--color-border)', paddingBottom: '6px' }}>
@@ -1328,6 +1367,7 @@ Diagnostics:
               )}
             </div>
           </div>
+        )}
         </div>
       )}
 
