@@ -7,9 +7,6 @@ import {
   Home, 
   Video, 
   Settings, 
-  Activity, 
-  Plus, 
-  Cpu, 
   RefreshCw
 } from 'lucide-react';
 
@@ -77,27 +74,11 @@ const OceanEyesDashboard: React.FC = () => {
           </button>
 
           <button 
-            className={`sidebar-link ${activeTab === 'history' ? 'active' : ''}`}
-            onClick={() => setActiveTab('history')}
-          >
-            <Activity size={18} />
-            <span>Clarity Analytics</span>
-          </button>
-
-          <button 
-            className={`sidebar-link ${activeTab === 'my_fish' ? 'active' : ''}`}
-            onClick={() => setActiveTab('my_fish')}
-          >
-            <Plus size={18} />
-            <span>Fish Inventory</span>
-          </button>
-
-          <button 
             className={`sidebar-link ${activeTab === 'settings' || activeTab === 'alerts' ? 'active' : ''}`}
             onClick={() => setActiveTab('settings')}
           >
             <Settings size={18} />
-            <span>Tank Boundaries</span>
+            <span>Tank Settings</span>
             {activeAlertCount > 0 && (
               <span style={{
                 marginLeft: 'auto',
@@ -111,21 +92,6 @@ const OceanEyesDashboard: React.FC = () => {
                 {activeAlertCount}
               </span>
             )}
-          </button>
-
-          {/* IoT Tank Simulator Console replaces the hard monitor mockup device frame! */}
-          <div style={{ margin: '12px 0 6px 0', height: '1px', backgroundColor: 'var(--color-border)' }} />
-          
-          <button 
-            className={`sidebar-link ${activeTab === 'monitor' ? 'active' : ''}`}
-            onClick={() => setActiveTab('monitor')}
-            style={{ 
-              backgroundColor: activeTab === 'monitor' ? 'rgba(13, 148, 136, 0.1)' : 'rgba(0,0,0,0.01)',
-              border: '1px dashed rgba(13, 148, 136, 0.25)' 
-            }}
-          >
-            <Cpu size={18} style={{ color: 'var(--color-primary)' }} />
-            <span style={{ color: 'var(--color-primary-dark)' }}>IoT Scanner Console</span>
           </button>
         </nav>
 

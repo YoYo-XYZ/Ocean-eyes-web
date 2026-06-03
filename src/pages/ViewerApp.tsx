@@ -20,7 +20,8 @@ import {
   Square,
   ZoomIn,
   ZoomOut,
-  Download
+  Download,
+  Cpu
 } from 'lucide-react'; // Elegant modern icons representing Material equivalents
 
 export const ViewerApp: React.FC = () => {
@@ -506,7 +507,7 @@ const HomeScreen: React.FC = () => {
 
 // ─── LiveScreen Component ───
 const LiveScreen: React.FC = () => {
-  const { liveState, activeTank, triggerManualReading } = useApp();
+  const { liveState, activeTank, triggerManualReading, setActiveTab } = useApp();
   const [isStreaming, setIsStreaming] = useState(false);
   const [zoomLevel, setZoomLevel] = useState(1.0);
   const [isRecording, setIsRecording] = useState(false);
@@ -1076,13 +1077,22 @@ Diagnostics:
             <p style={{ fontSize: '12px', color: 'var(--color-text-secondary)', lineHeight: '140%' }}>
               This simulates an active stream connection. In the background, the IoT Monitor reads the water levels and syncs data to Firestore in real time.
             </p>
-            <button 
-              className="primary-button" 
-              style={{ padding: '8px 12px', fontSize: '12px', marginTop: '4px', borderRadius: '16px' }}
-              onClick={triggerManualReading}
-            >
-              <RefreshCw size={12} /> Force New Metric Scan
-            </button>
+            <div style={{ display: 'flex', gap: '10px', marginTop: '4px' }}>
+              <button 
+                className="primary-button" 
+                style={{ padding: '8px 12px', fontSize: '12px', borderRadius: '16px', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+                onClick={triggerManualReading}
+              >
+                <RefreshCw size={12} /> Force Metric Scan
+              </button>
+              <button 
+                className="secondary-button" 
+                style={{ padding: '8px 12px', fontSize: '12px', borderRadius: '16px', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+                onClick={() => setActiveTab('monitor')}
+              >
+                <Cpu size={12} /> IoT Scanner Console
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -1284,11 +1294,19 @@ const SettingsScreen: React.FC = () => {
         </div>
 
         <div 
-          style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 0', cursor: 'pointer' }}
+          style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 0', borderBottom: '1px solid var(--color-border)', cursor: 'pointer' }}
           onClick={() => setActiveTab('alerts')}
         >
           <span style={{ fontSize: '15px', fontWeight: 600 }}>Safety Alert Logs</span>
           <ChevronRight size={18} style={{ color: 'var(--color-text-secondary)' }} />
+        </div>
+
+        <div 
+          style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 0', cursor: 'pointer' }}
+          onClick={() => setActiveTab('monitor')}
+        >
+          <span style={{ fontSize: '15px', fontWeight: 600, color: 'var(--color-primary)' }}>IoT Scanner Console</span>
+          <ChevronRight size={18} style={{ color: 'var(--color-primary)' }} />
         </div>
       </div>
 
