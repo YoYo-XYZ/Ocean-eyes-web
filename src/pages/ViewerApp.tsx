@@ -1,5 +1,5 @@
 // ViewerApp.tsx - Recreating Flutter UI screens for the Mobile Viewer Portal
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { MockFirestore } from '../services/mock_service';
 import { 
@@ -14,7 +14,13 @@ import {
   Droplet,
   Thermometer,
   Shield,
-  Clock
+  Clock,
+  Camera,
+  Video,
+  Square,
+  ZoomIn,
+  ZoomOut,
+  Download
 } from 'lucide-react'; // Elegant modern icons representing Material equivalents
 
 export const ViewerApp: React.FC = () => {
@@ -502,6 +508,69 @@ const HomeScreen: React.FC = () => {
 const LiveScreen: React.FC = () => {
   const { liveState, activeTank, triggerManualReading } = useApp();
   const [isStreaming, setIsStreaming] = useState(false);
+  const [zoomLevel, setZoomLevel] = useState(1.0);
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingSeconds, setRecordingSeconds] = useState(0);
+  const [flashActive, setFlashActive] = useState(false);
+
+  // Drag and pan states for zoom
+  const [isDragging, setIsDragging] = useState(false);
+  const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+
+  // Reset panOffset when zoom level changes back to 1.0
+  useEffect(() => {
+    if (zoomLevel === 1.0) {
+      setPanOffset({ x: 0, y: 0 });
+    }
+  }, [zoomLevel]);
+
+  // Persistence galleries in LocalStorage
+  const [snapshots, setSnapshots] = useState<{
+    id: string;
+    timestamp: string;
+    imageUrl: string;
+    fishCount: number;
+    clarity: number;
+  }[]>(() => {
+    const saved = localStorage.getItem('oceaneyes_snapshots');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  const [recordings, setRecordings] = useState<{
+    id: string;
+    timestamp: string;
+    duration: number;
+    fishCount: number;
+    clarity: number;
+  }[]>(() => {
+    const saved = localStorage.getItem('oceaneyes_recordings');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  // Sync to local storage
+  useEffect(() => {
+    localStorage.setItem('oceaneyes_snapshots', JSON.stringify(snapshots));
+  }, [snapshots]);
+
+  useEffect(() => {
+    localStorage.setItem('oceaneyes_recordings', JSON.stringify(recordings));
+  }, [recordings]);
+
+  // Recording timer logic
+  useEffect(() => {
+    let interval: any = null;
+    if (isRecording) {
+      interval = setInterval(() => {
+        setRecordingSeconds(prev => prev + 1);
+      }, 1000);
+    } else {
+      if (interval) clearInterval(interval);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [isRecording]);
 
   const startStream = () => {
     setIsStreaming(true);
@@ -522,6 +591,8 @@ const LiveScreen: React.FC = () => {
 
   const stopStream = () => {
     setIsStreaming(false);
+    setIsRecording(false);
+    setZoomLevel(1.0);
     if (activeTank) {
       const key = `live_state_${activeTank.id}`;
       localStorage.setItem(key, JSON.stringify({
@@ -540,6 +611,241 @@ const LiveScreen: React.FC = () => {
   const stateClarity = isStreaming && liveState?.is_live ? liveState.current_clarity : 0;
   const stateFish = isStreaming && liveState?.is_live ? liveState.current_fish_count : 0;
 
+  const formatTime = (totalSeconds: number) => {
+    const mins = Math.floor(totalSeconds / 60);
+    const secs = totalSeconds % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  // Drag handlers
+  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (zoomLevel <= 1.0) return;
+    setIsDragging(true);
+    setDragStart({
+      x: e.clientX - panOffset.x,
+      y: e.clientY - panOffset.y
+    });
+  };
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!isDragging || zoomLevel <= 1.0) return;
+    
+    let newX = e.clientX - dragStart.x;
+    let newY = e.clientY - dragStart.y;
+    
+    const container = e.currentTarget.getBoundingClientRect();
+    const limitX = (container.width * (zoomLevel - 1)) / 2;
+    const limitY = (container.height * (zoomLevel - 1)) / 2;
+    
+    newX = Math.max(-limitX, Math.min(limitX, newX));
+    newY = Math.max(-limitY, Math.min(limitY, newY));
+    
+    setPanOffset({ x: newX, y: newY });
+  };
+
+  const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (zoomLevel <= 1.0 || e.touches.length !== 1) return;
+    const touch = e.touches[0];
+    setIsDragging(true);
+    setDragStart({
+      x: touch.clientX - panOffset.x,
+      y: touch.clientY - panOffset.y
+    });
+  };
+
+  const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (!isDragging || zoomLevel <= 1.0 || e.touches.length !== 1) return;
+    const touch = e.touches[0];
+    
+    let newX = touch.clientX - dragStart.x;
+    let newY = touch.clientY - dragStart.y;
+    
+    const container = e.currentTarget.getBoundingClientRect();
+    const limitX = (container.width * (zoomLevel - 1)) / 2;
+    const limitY = (container.height * (zoomLevel - 1)) / 2;
+    
+    newX = Math.max(-limitX, Math.min(limitX, newX));
+    newY = Math.max(-limitY, Math.min(limitY, newY));
+    
+    setPanOffset({ x: newX, y: newY });
+  };
+
+  const handleMouseUpOrLeave = () => {
+    setIsDragging(false);
+  };
+
+  const takeSnapshot = () => {
+    if (!isStreaming) return;
+    setFlashActive(true);
+    setTimeout(() => setFlashActive(false), 400);
+
+    const canvas = document.createElement('canvas');
+    canvas.width = 640;
+    canvas.height = 360;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    // 1. Gradient Background
+    const grad = ctx.createLinearGradient(0, 0, 0, 360);
+    grad.addColorStop(0, '#0F766E');
+    grad.addColorStop(0.5, '#115E59');
+    grad.addColorStop(1, '#134E4A');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, 640, 360);
+
+    // 2. Camera Grid Overlay
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.04)';
+    ctx.lineWidth = 1;
+    for (let x = 0; x < 640; x += 40) {
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, 360);
+      ctx.stroke();
+    }
+    for (let y = 0; y < 360; y += 40) {
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(640, y);
+      ctx.stroke();
+    }
+
+    // 3. Zoom-scaled items
+    ctx.save();
+    ctx.translate(panOffset.x, panOffset.y);
+    ctx.translate(320, 180);
+    ctx.scale(zoomLevel, zoomLevel);
+    ctx.translate(-320, -180);
+
+    // Aquatic Emoji Elements
+    ctx.font = '36px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('🌿', 80, 60);
+    ctx.fillText('🍀', 560, 280);
+
+    ctx.fillText('🐟', 200, 140);
+    ctx.fillText('🐠', 460, 200);
+    ctx.fillText('🐡', 280, 260);
+
+    // Calibrated water line
+    if (activeTank?.calibration) {
+      const yPercent = activeTank.calibration.water_line_y / 240;
+      const canvasY = yPercent * 360;
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([4, 4]);
+      ctx.beginPath();
+      ctx.moveTo(0, canvasY);
+      ctx.lineTo(640, canvasY);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+      ctx.font = 'bold 9px monospace';
+      ctx.fillText('CALIBRATED WATER LINE', 520, canvasY - 10);
+    }
+    ctx.restore();
+
+    // 4. Overlays (Static HUD)
+    if (isRecording) {
+      ctx.fillStyle = 'rgba(239, 68, 68, 0.85)';
+      ctx.beginPath();
+      ctx.arc(30, 25, 6, 0, 2 * Math.PI);
+      ctx.fill();
+
+      ctx.fillStyle = '#FFFFFF';
+      ctx.font = 'bold 11px monospace';
+      ctx.textAlign = 'left';
+      ctx.fillText(`REC ${formatTime(recordingSeconds)}`, 42, 25);
+    }
+
+    // Live Cam Pill
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.6)';
+    ctx.fillRect(520, 15, 100, 22);
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = 'bold 9px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(`LIVE CAM (FPS:30)`, 570, 26);
+
+    // 5. Diagnostics Overlay
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
+    ctx.fillRect(0, 310, 640, 50);
+
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = '10px Outfit, Inter, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText(`OCEANEYES AI DIAGNOSTICS`, 20, 335);
+
+    ctx.textAlign = 'right';
+    ctx.fillStyle = '#E2E8F0';
+    ctx.fillText(`FISH: ${stateFish} DETECTED  |  CLARITY: ${stateClarity}/10  |  ZOOM: ${zoomLevel.toFixed(1)}x`, 620, 335);
+
+    const imgUrl = canvas.toDataURL('image/png');
+    const newSnapshot = {
+      id: `snap_${Date.now()}`,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+      imageUrl: imgUrl,
+      fishCount: stateFish,
+      clarity: stateClarity
+    };
+    setSnapshots(prev => [newSnapshot, ...prev]);
+  };
+
+  const downloadSnapshot = (snap: { id: string; imageUrl: string }) => {
+    const link = document.createElement('a');
+    link.download = `OceanEyes_Snapshot_${snap.id}.png`;
+    link.href = snap.imageUrl;
+    link.click();
+  };
+
+  const deleteSnapshot = (id: string) => {
+    setSnapshots(prev => prev.filter(s => s.id !== id));
+  };
+
+  const toggleRecording = () => {
+    if (isRecording) {
+      setIsRecording(false);
+      const newRecording = {
+        id: `rec_${Date.now()}`,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+        duration: recordingSeconds,
+        fishCount: stateFish,
+        clarity: stateClarity
+      };
+      setRecordings(prev => [newRecording, ...prev]);
+    } else {
+      setIsRecording(true);
+      setRecordingSeconds(0);
+    }
+  };
+
+  const downloadRecording = (rec: { id: string; timestamp: string; duration: number; fishCount: number; clarity: number }) => {
+    const logContent = `OCEANEYES AI SMART AQUARIUM RECORDING LOG
+================================================
+Recording ID: ${rec.id}
+Timestamp: ${rec.timestamp}
+Duration: ${rec.duration} seconds
+Species Count: ${rec.fishCount} detected
+Clarity Rating: ${rec.clarity} / 10
+Diagnostics:
+  - RTSP Stream link verified.
+  - Video stream encoded at 30 FPS.
+  - AI computer vision scan: Completed with no discrepancies.
+================================================`;
+    
+    const blob = new Blob([logContent], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.download = `OceanEyes_Recording_${rec.id}.log`;
+    link.href = url;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const deleteRecording = (id: string) => {
+    setRecordings(prev => prev.filter(r => r.id !== id));
+  };
+
   return (
     <div style={{ padding: '0 20px 30px 20px' }}>
       <div className="canvas-header" style={{ marginBottom: '24px' }}>
@@ -550,9 +856,30 @@ const LiveScreen: React.FC = () => {
       </div>
 
       {/* Simulated Video Frame */}
-      <div className="live-camera-feed" style={{ marginBottom: '24px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+      <div 
+        className="live-camera-feed" 
+        style={{ 
+          marginBottom: '24px', 
+          display: 'flex', 
+          justifyContent: 'center', 
+          alignItems: 'center',
+          cursor: zoomLevel > 1.0 ? (isDragging ? 'grabbing' : 'grab') : 'default',
+          userSelect: 'none',
+          touchAction: zoomLevel > 1.0 ? 'none' : 'auto'
+        }}
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUpOrLeave}
+        onMouseLeave={handleMouseUpOrLeave}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleMouseUpOrLeave}
+      >
         {isStreaming ? (
           <>
+            {/* Shutter flash overlay */}
+            <div className={`camera-flash-overlay ${flashActive ? 'flash-active' : ''}`} />
+
             {/* Live Camera Grid Lines */}
             <div className="camera-grid" />
             <div className="camera-scanline" />
@@ -563,7 +890,10 @@ const LiveScreen: React.FC = () => {
               height: '100%',
               background: 'linear-gradient(180deg, #0F766E 0%, #115E59 50%, #134E4A 100%)',
               position: 'absolute',
-              overflow: 'hidden'
+              overflow: 'hidden',
+              transform: `translate(${panOffset.x}px, ${panOffset.y}px) scale(${zoomLevel})`,
+              transformOrigin: 'center',
+              transition: isDragging ? 'none' : 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
             }}>
               {/* Aquatic Floating Plants */}
               <div style={{ position: 'absolute', top: '10%', left: '10%', fontSize: '48px', opacity: 0.15 }} className="anim-float-1">🌿</div>
@@ -612,6 +942,94 @@ const LiveScreen: React.FC = () => {
               <span>FPS: 30</span>
             </div>
 
+            {/* Recording HUD indicator */}
+            {isRecording && (
+              <div className="live-overlay-pill" style={{ left: '50%', transform: 'translateX(-50%)', backgroundColor: 'rgba(239, 68, 68, 0.85)' }}>
+                <div className="recording-dot" />
+                <span>REC {formatTime(recordingSeconds)}</span>
+              </div>
+            )}
+
+            {/* Live Camera Controls Overlay */}
+            <div style={{
+              position: 'absolute',
+              bottom: '12px',
+              right: '12px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              zIndex: 20
+            }}>
+              {/* Zoom Controls */}
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                background: 'rgba(15, 23, 42, 0.75)',
+                backdropFilter: 'blur(8px)',
+                borderRadius: '20px',
+                border: '1px solid rgba(255, 255, 255, 0.15)',
+                padding: '2px 8px',
+                gap: '6px',
+                color: '#FFF',
+                fontSize: '11px',
+                fontWeight: 600,
+                height: '40px'
+              }}>
+                <button 
+                  onClick={() => setZoomLevel(prev => Math.max(1, prev - 0.5))}
+                  disabled={zoomLevel <= 1}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: zoomLevel <= 1 ? 'rgba(255,255,255,0.3)' : '#FFF',
+                    cursor: zoomLevel <= 1 ? 'not-allowed' : 'pointer',
+                    padding: '4px',
+                    display: 'flex',
+                    alignItems: 'center'
+                  }}
+                  title="Zoom Out"
+                >
+                  <ZoomOut size={14} />
+                </button>
+                <span style={{ minWidth: '32px', textAlign: 'center' }}>{zoomLevel.toFixed(1)}x</span>
+                <button 
+                  onClick={() => setZoomLevel(prev => Math.min(3, prev + 0.5))}
+                  disabled={zoomLevel >= 3}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: zoomLevel >= 3 ? 'rgba(255,255,255,0.3)' : '#FFF',
+                    cursor: zoomLevel >= 3 ? 'not-allowed' : 'pointer',
+                    padding: '4px',
+                    display: 'flex',
+                    alignItems: 'center'
+                  }}
+                  title="Zoom In"
+                >
+                  <ZoomIn size={14} />
+                </button>
+              </div>
+
+              {/* Capture Button */}
+              <button 
+                className="camera-control-btn"
+                onClick={takeSnapshot}
+                title="Capture Snapshot"
+              >
+                <Camera size={16} />
+              </button>
+
+              {/* Record Button */}
+              <button 
+                className={`camera-control-btn ${isRecording ? 'recording-active' : ''}`}
+                onClick={toggleRecording}
+                title={isRecording ? "Stop Recording" : "Start Recording"}
+              >
+                {isRecording ? <Square size={14} /> : <Video size={16} />}
+              </button>
+            </div>
+
+            {/* Bottom-left telemetry badges */}
             <div style={{
               position: 'absolute',
               bottom: '12px',
@@ -665,6 +1083,112 @@ const LiveScreen: React.FC = () => {
             >
               <RefreshCw size={12} /> Force New Metric Scan
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Galleries Section */}
+      {isStreaming && (snapshots.length > 0 || recordings.length > 0) && (
+        <div className="camera-gallery-grid">
+          {/* Snapshots Gallery */}
+          <div className="gallery-section">
+            <h3 className="gallery-title">
+              <Camera size={18} />
+              <span>Recent Snapshots ({snapshots.length})</span>
+            </h3>
+            <div className="gallery-list">
+              {snapshots.length === 0 ? (
+                <p style={{ fontSize: '12px', color: 'var(--color-text-secondary)', padding: '12px' }}>
+                  No snapshots captured.
+                </p>
+              ) : (
+                snapshots.map(snap => (
+                  <div key={snap.id} className="snapshot-card">
+                    <div className="snapshot-thumb-container">
+                      <img src={snap.imageUrl} alt="Snapshot" className="snapshot-thumb" />
+                    </div>
+                    <div className="snapshot-info">
+                      <div>
+                        <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)', display: 'block' }}>
+                          Captured at {snap.timestamp}
+                        </span>
+                        <strong style={{ fontSize: '13px', display: 'block', marginTop: '2px', color: 'var(--color-text-primary)' }}>
+                          {snap.fishCount} Fish Detected
+                        </strong>
+                        <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)', display: 'block' }}>
+                          Clarity score: {snap.clarity}/10
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
+                        <button 
+                          className="secondary-button" 
+                          style={{ padding: '4px 8px', fontSize: '11px', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '4px' }}
+                          onClick={() => downloadSnapshot(snap)}
+                        >
+                          <Download size={12} /> Download
+                        </button>
+                        <button 
+                          className="secondary-button" 
+                          style={{ padding: '4px 8px', fontSize: '11px', borderRadius: '8px', color: 'var(--color-critical)', borderColor: 'rgba(239, 68, 68, 0.15)' }}
+                          onClick={() => deleteSnapshot(snap.id)}
+                        >
+                          <Trash2 size={12} />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          {/* Recordings List */}
+          <div className="gallery-section">
+            <h3 className="gallery-title">
+              <Video size={18} />
+              <span>Recent Recordings ({recordings.length})</span>
+            </h3>
+            <div className="gallery-list">
+              {recordings.length === 0 ? (
+                <p style={{ fontSize: '12px', color: 'var(--color-text-secondary)', padding: '12px' }}>
+                  No video recordings saved.
+                </p>
+              ) : (
+                recordings.map(rec => (
+                  <div key={rec.id} className="recording-card">
+                    <div>
+                      <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)', display: 'block' }}>
+                        Recorded at {rec.timestamp}
+                      </span>
+                      <strong style={{ fontSize: '13px', display: 'block', marginTop: '2px', color: 'var(--color-text-primary)' }}>
+                        Duration: {formatTime(rec.duration)}
+                      </strong>
+                      <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>
+                        {rec.fishCount} fish | Clarity: {rec.clarity}/10
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      <button 
+                        className="secondary-button" 
+                        style={{ padding: '6px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                        onClick={() => downloadRecording(rec)}
+                        title="Download Telemetry Log"
+                      >
+                        <Download size={14} />
+                      </button>
+                      <button 
+                        className="secondary-button" 
+                        style={{ padding: '6px', borderRadius: '8px', color: 'var(--color-critical)', borderColor: 'rgba(239, 68, 68, 0.15)' }}
+                        onClick={() => deleteRecording(rec.id)}
+                        title="Delete Recording"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
           </div>
         </div>
       )}
