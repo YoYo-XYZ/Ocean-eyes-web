@@ -235,13 +235,7 @@ const MonitorCalibrationScreen: React.FC<ScreenProps> = ({ onNavigate }) => {
 
   const handleDrag = (e: React.MouseEvent<HTMLDivElement> | React.TouchEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
-    let clientY = 0;
-    
-    if ('touches' in e) {
-      clientY = e.touches[0].clientY;
-    } else {
-      clientY = e.clientY;
-    }
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
     
     const y = Math.min(240, Math.max(0, clientY - rect.top));
     setLineY(y);

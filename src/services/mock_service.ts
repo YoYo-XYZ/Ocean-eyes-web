@@ -206,7 +206,7 @@ export class MockFirestore {
         localStorage.setItem('tanks', JSON.stringify(parsed));
       }
       return parsed;
-    } catch (e) {
+    } catch {
       localStorage.setItem('tanks', JSON.stringify(defaultTanks));
       return defaultTanks;
     }
@@ -423,7 +423,7 @@ export class MockFirestore {
         localStorage.setItem('user_tanks', JSON.stringify(parsed));
       }
       return parsed;
-    } catch (e) {
+    } catch {
       localStorage.setItem('user_tanks', JSON.stringify(defaultLinked));
       return defaultLinked;
     }

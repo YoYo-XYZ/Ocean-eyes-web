@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/set-state-in-effect */
 // ViewerApp.tsx - Recreating Flutter UI screens for the Mobile Viewer Portal
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
@@ -227,7 +228,7 @@ const HomeScreen: React.FC = () => {
         await createAndLinkTank(newTankName.trim());
         setNewTankName('');
         setShowAddTankModal(false);
-      } catch (err) {
+      } catch {
         setAddError('Failed to create tank.');
       }
     } else {
@@ -982,6 +983,48 @@ const HomeScreen: React.FC = () => {
   );
 };
 
+interface CameraFilters {
+  contrast: number;
+  brightness: number;
+  saturation: number;
+  temperature: number;
+  tint: number;
+}
+
+interface FilterPreset {
+  id: string;
+  name: string;
+  isCustom: boolean;
+  filters: CameraFilters;
+}
+
+const DEFAULT_PRESETS: FilterPreset[] = [
+  {
+    id: 'normal',
+    name: 'Normal',
+    isCustom: false,
+    filters: { contrast: 100, brightness: 100, saturation: 100, temperature: 0, tint: 0 }
+  },
+  {
+    id: 'vivid',
+    name: 'Vivid Reef',
+    isCustom: false,
+    filters: { contrast: 125, brightness: 100, saturation: 140, temperature: 10, tint: 0 }
+  },
+  {
+    id: 'deep-blue',
+    name: 'Deep Blue',
+    isCustom: false,
+    filters: { contrast: 110, brightness: 95, saturation: 120, temperature: -40, tint: 10 }
+  },
+  {
+    id: 'cctv-retro',
+    name: 'CCTV Retro',
+    isCustom: false,
+    filters: { contrast: 85, brightness: 105, saturation: 0, temperature: 0, tint: 0 }
+  }
+];
+
 // ─── LiveScreen Component ───
 const LiveScreen: React.FC = () => {
   const { liveState, activeTank, triggerManualReading, setActiveTab } = useApp();
@@ -991,11 +1034,86 @@ const LiveScreen: React.FC = () => {
     if (liveState) {
       setIsStreaming(liveState.is_live);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [liveState?.is_live]);
   const [zoomLevel, setZoomLevel] = useState(1.0);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const [flashActive, setFlashActive] = useState(false);
+
+  // Camera filter states
+  const [filters, setFilters] = useState<CameraFilters>({
+    contrast: 100,
+    brightness: 100,
+    saturation: 100,
+    temperature: 0,
+    tint: 0
+  });
+
+  const [customPresets, setCustomPresets] = useState<FilterPreset[]>(() => {
+    const saved = localStorage.getItem('oceaneyes_camera_presets');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  const [selectedPresetId, setSelectedPresetId] = useState<string>('normal');
+  const [newPresetName, setNewPresetName] = useState('');
+  const [showSavePresetInput, setShowSavePresetInput] = useState(false);
+
+  const applyPreset = (preset: FilterPreset) => {
+    setSelectedPresetId(preset.id);
+    setFilters({ ...preset.filters });
+  };
+
+  const handleSavePreset = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newPresetName.trim()) return;
+
+    const presetId = `preset-${Date.now()}`;
+    const newPreset: FilterPreset = {
+      id: presetId,
+      name: newPresetName.trim(),
+      isCustom: true,
+      filters: { ...filters }
+    };
+
+    const updated = [...customPresets, newPreset];
+    setCustomPresets(updated);
+    localStorage.setItem('oceaneyes_camera_presets', JSON.stringify(updated));
+    setSelectedPresetId(presetId);
+    setNewPresetName('');
+    setShowSavePresetInput(false);
+  };
+
+  const handleDeletePreset = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const updated = customPresets.filter(p => p.id !== id);
+    setCustomPresets(updated);
+    localStorage.setItem('oceaneyes_camera_presets', JSON.stringify(updated));
+    if (selectedPresetId === id) {
+      applyPreset(DEFAULT_PRESETS[0]);
+    }
+  };
+
+  const handleFilterChange = (key: keyof CameraFilters, val: number) => {
+    const updatedFilters = { ...filters, [key]: val };
+    setFilters(updatedFilters);
+    
+    // Check if it matches any preset
+    const allPresets = [...DEFAULT_PRESETS, ...customPresets];
+    const matchingPreset = allPresets.find(p => 
+      p.filters.contrast === updatedFilters.contrast &&
+      p.filters.brightness === updatedFilters.brightness &&
+      p.filters.saturation === updatedFilters.saturation &&
+      p.filters.temperature === updatedFilters.temperature &&
+      p.filters.tint === updatedFilters.tint
+    );
+    
+    if (matchingPreset) {
+      setSelectedPresetId(matchingPreset.id);
+    } else {
+      setSelectedPresetId('custom');
+    }
+  };
 
   // Multi-camera feeds view states
   const [isGridView, setIsGridView] = useState(false);
@@ -1049,7 +1167,7 @@ const LiveScreen: React.FC = () => {
 
   // Recording timer logic
   useEffect(() => {
-    let interval: any = null;
+    let interval: ReturnType<typeof setInterval> | null = null;
     if (isRecording) {
       interval = setInterval(() => {
         setRecordingSeconds(prev => prev + 1);
@@ -1224,6 +1342,7 @@ const LiveScreen: React.FC = () => {
 
     const renderAllToCanvas = (bgImg?: HTMLImageElement) => {
       // 1. Draw Background (mock image or gradient)
+      ctx.filter = `contrast(${filters.contrast}%) brightness(${filters.brightness}%) saturate(${filters.saturation}%)`;
       if (bgImg) {
         ctx.drawImage(bgImg, 0, 0, 640, 360);
       } else {
@@ -1233,6 +1352,29 @@ const LiveScreen: React.FC = () => {
         grad.addColorStop(1, '#134E4A');
         ctx.fillStyle = grad;
         ctx.fillRect(0, 0, 640, 360);
+      }
+      ctx.filter = 'none'; // reset filter for overlays
+
+      // Apply Temperature Overlay on Canvas
+      if (filters.temperature !== 0) {
+        ctx.save();
+        ctx.globalCompositeOperation = 'color';
+        ctx.fillStyle = filters.temperature > 0 
+          ? `rgba(255, 176, 0, ${Math.abs(filters.temperature) / 300})` 
+          : `rgba(0, 160, 255, ${Math.abs(filters.temperature) / 300})`;
+        ctx.fillRect(0, 0, 640, 360);
+        ctx.restore();
+      }
+
+      // Apply Tint Overlay on Canvas
+      if (filters.tint !== 0) {
+        ctx.save();
+        ctx.globalCompositeOperation = 'color';
+        ctx.fillStyle = filters.tint > 0 
+          ? `rgba(255, 0, 187, ${Math.abs(filters.tint) / 400})` 
+          : `rgba(0, 255, 68, ${Math.abs(filters.tint) / 400})`;
+        ctx.fillRect(0, 0, 640, 360);
+        ctx.restore();
       }
 
       // 2. Camera Grid Overlay
@@ -1593,8 +1735,40 @@ Diagnostics:
                 backgroundSize: 'cover',
                 backgroundPosition: 'center',
                 position: 'absolute',
-                overflow: 'hidden'
+                overflow: 'hidden',
+                filter: feed.id === activeFeed.id ? `contrast(${filters.contrast}%) brightness(${filters.brightness}%) saturate(${filters.saturation}%)` : 'none'
               }}>
+                {/* Temperature Overlay in Grid View */}
+                {feed.id === activeFeed.id && filters.temperature !== 0 && (
+                  <div style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    height: '100%',
+                    backgroundColor: filters.temperature > 0 ? '#ffb000' : '#00a0ff',
+                    opacity: Math.abs(filters.temperature) / 300,
+                    mixBlendMode: 'color',
+                    pointerEvents: 'none',
+                    zIndex: 4
+                  }} />
+                )}
+
+                {/* Tint Overlay in Grid View */}
+                {feed.id === activeFeed.id && filters.tint !== 0 && (
+                  <div style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    height: '100%',
+                    backgroundColor: filters.tint > 0 ? '#ff00bb' : '#00ff44',
+                    opacity: Math.abs(filters.tint) / 400,
+                    mixBlendMode: 'color',
+                    pointerEvents: 'none',
+                    zIndex: 5
+                  }} />
+                )}
                 <div style={{ position: 'absolute', top: '10%', left: '10%', fontSize: '32px', opacity: 0.2 }}>🌿</div>
                 <div style={{ position: 'absolute', bottom: '15%', right: '12%', fontSize: '42px', opacity: 0.25 }}>🍀</div>
                 <div style={{ position: 'absolute', top: '35%', left: '30%', fontSize: '24px', textShadow: '0 2px 4px rgba(0,0,0,0.5)' }}>🐟</div>
@@ -1667,8 +1841,40 @@ Diagnostics:
                 overflow: 'hidden',
                 transform: `translate(${panOffset.x}px, ${panOffset.y}px) scale(${zoomLevel})`,
                 transformOrigin: 'center',
-                transition: isDragging ? 'none' : 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+                transition: isDragging ? 'none' : 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                filter: `contrast(${filters.contrast}%) brightness(${filters.brightness}%) saturate(${filters.saturation}%)`
               }}>
+                {/* Temperature Overlay */}
+                {filters.temperature !== 0 && (
+                  <div style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    height: '100%',
+                    backgroundColor: filters.temperature > 0 ? '#ffb000' : '#00a0ff',
+                    opacity: Math.abs(filters.temperature) / 300,
+                    mixBlendMode: 'color',
+                    pointerEvents: 'none',
+                    zIndex: 4
+                  }} />
+                )}
+
+                {/* Tint Overlay */}
+                {filters.tint !== 0 && (
+                  <div style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    height: '100%',
+                    backgroundColor: filters.tint > 0 ? '#ff00bb' : '#00ff44',
+                    opacity: Math.abs(filters.tint) / 400,
+                    mixBlendMode: 'color',
+                    pointerEvents: 'none',
+                    zIndex: 5
+                  }} />
+                )}
                 {/* Aquatic Floating Plants */}
                 <div style={{ position: 'absolute', top: '10%', left: '10%', fontSize: '48px', opacity: 0.2 }} className="anim-float-1">🌿</div>
                 <div style={{ position: 'absolute', bottom: '15%', right: '12%', fontSize: '64px', opacity: 0.25 }} className="anim-float-2">🍀</div>
@@ -1834,6 +2040,275 @@ Diagnostics:
               </button>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Stream Image Adjustments Card */}
+      {isStreaming && !isGridView && (
+        <div className="card-decoration" style={{ padding: '24px', marginBottom: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          <h3 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--color-text-primary)', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span>🎨 Stream Image Adjustments</span>
+          </h3>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '24px' }}>
+            {/* Left Column - Adjustment Sliders */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <h4 style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text-secondary)', margin: 0, borderBottom: '1px solid var(--color-border)', paddingBottom: '6px' }}>
+                TUNING SLIDERS
+              </h4>
+
+              {/* Contrast */}
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '4px' }}>
+                  <span style={{ fontWeight: 600, color: 'var(--color-text-primary)' }}>Contrast</span>
+                  <span style={{ color: 'var(--color-primary)' }}>{filters.contrast}%</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <input 
+                    type="range" min="50" max="150" step="5"
+                    value={filters.contrast}
+                    onChange={(e) => handleFilterChange('contrast', parseInt(e.target.value))}
+                    style={{ flex: 1, accentColor: 'var(--color-primary)' }}
+                  />
+                  <button 
+                    onClick={() => handleFilterChange('contrast', 100)}
+                    style={{ background: 'none', border: 'none', color: 'var(--color-text-secondary)', cursor: 'pointer', fontSize: '10px' }}
+                  >
+                    Reset
+                  </button>
+                </div>
+              </div>
+
+              {/* Brightness */}
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '4px' }}>
+                  <span style={{ fontWeight: 600, color: 'var(--color-text-primary)' }}>Brightness</span>
+                  <span style={{ color: 'var(--color-primary)' }}>{filters.brightness}%</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <input 
+                    type="range" min="70" max="130" step="5"
+                    value={filters.brightness}
+                    onChange={(e) => handleFilterChange('brightness', parseInt(e.target.value))}
+                    style={{ flex: 1, accentColor: 'var(--color-primary)' }}
+                  />
+                  <button 
+                    onClick={() => handleFilterChange('brightness', 100)}
+                    style={{ background: 'none', border: 'none', color: 'var(--color-text-secondary)', cursor: 'pointer', fontSize: '10px' }}
+                  >
+                    Reset
+                  </button>
+                </div>
+              </div>
+
+              {/* Saturation */}
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '4px' }}>
+                  <span style={{ fontWeight: 600, color: 'var(--color-text-primary)' }}>Saturation</span>
+                  <span style={{ color: 'var(--color-primary)' }}>{filters.saturation}%</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <input 
+                    type="range" min="50" max="150" step="5"
+                    value={filters.saturation}
+                    onChange={(e) => handleFilterChange('saturation', parseInt(e.target.value))}
+                    style={{ flex: 1, accentColor: 'var(--color-primary)' }}
+                  />
+                  <button 
+                    onClick={() => handleFilterChange('saturation', 100)}
+                    style={{ background: 'none', border: 'none', color: 'var(--color-text-secondary)', cursor: 'pointer', fontSize: '10px' }}
+                  >
+                    Reset
+                  </button>
+                </div>
+              </div>
+
+              {/* Temperature */}
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '4px' }}>
+                  <span style={{ fontWeight: 600, color: 'var(--color-text-primary)' }}>Temperature (Cool / Warm)</span>
+                  <span style={{ color: 'var(--color-primary)' }}>
+                    {filters.temperature > 0 ? `Warm (+${filters.temperature})` : filters.temperature < 0 ? `Cool (${filters.temperature})` : 'Neutral'}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <input 
+                    type="range" min="-80" max="80" step="5"
+                    value={filters.temperature}
+                    onChange={(e) => handleFilterChange('temperature', parseInt(e.target.value))}
+                    style={{ flex: 1, accentColor: 'var(--color-primary)' }}
+                  />
+                  <button 
+                    onClick={() => handleFilterChange('temperature', 0)}
+                    style={{ background: 'none', border: 'none', color: 'var(--color-text-secondary)', cursor: 'pointer', fontSize: '10px' }}
+                  >
+                    Reset
+                  </button>
+                </div>
+              </div>
+
+              {/* Tint */}
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '4px' }}>
+                  <span style={{ fontWeight: 600, color: 'var(--color-text-primary)' }}>Tint (Green / Magenta)</span>
+                  <span style={{ color: 'var(--color-primary)' }}>
+                    {filters.tint > 0 ? `Magenta (+${filters.tint})` : filters.tint < 0 ? `Green (${filters.tint})` : 'Neutral'}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <input 
+                    type="range" min="-80" max="80" step="5"
+                    value={filters.tint}
+                    onChange={(e) => handleFilterChange('tint', parseInt(e.target.value))}
+                    style={{ flex: 1, accentColor: 'var(--color-primary)' }}
+                  />
+                  <button 
+                    onClick={() => handleFilterChange('tint', 0)}
+                    style={{ background: 'none', border: 'none', color: 'var(--color-text-secondary)', cursor: 'pointer', fontSize: '10px' }}
+                  >
+                    Reset
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Right Column - Presets Manager */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <h4 style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text-secondary)', margin: 0, borderBottom: '1px solid var(--color-border)', paddingBottom: '6px' }}>
+                FILTER PRESETS
+              </h4>
+
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                {DEFAULT_PRESETS.map(preset => (
+                  <button
+                    key={preset.id}
+                    onClick={() => applyPreset(preset)}
+                    className="secondary-button"
+                    style={{
+                      padding: '8px 12px',
+                      fontSize: '12px',
+                      borderRadius: '8px',
+                      background: selectedPresetId === preset.id ? 'var(--color-primary-light)' : 'var(--color-surface)',
+                      color: selectedPresetId === preset.id ? 'var(--color-primary-dark)' : 'var(--color-text-primary)',
+                      borderColor: selectedPresetId === preset.id ? 'var(--color-primary)' : 'var(--color-border)',
+                      fontWeight: 600,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {preset.name}
+                  </button>
+                ))}
+
+                {customPresets.map(preset => (
+                  <div 
+                    key={preset.id} 
+                    style={{ display: 'flex', alignItems: 'center', gap: '4px', position: 'relative' }}
+                  >
+                    <button
+                      onClick={() => applyPreset(preset)}
+                      className="secondary-button"
+                      style={{
+                        padding: '8px 24px 8px 12px',
+                        fontSize: '12px',
+                        borderRadius: '8px',
+                        background: selectedPresetId === preset.id ? 'var(--color-primary-light)' : 'var(--color-surface)',
+                        color: selectedPresetId === preset.id ? 'var(--color-primary-dark)' : 'var(--color-text-primary)',
+                        borderColor: selectedPresetId === preset.id ? 'var(--color-primary)' : 'var(--color-border)',
+                        fontWeight: 600,
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {preset.name}
+                    </button>
+                    <button
+                      onClick={(e) => handleDeletePreset(preset.id, e)}
+                      style={{
+                        position: 'absolute',
+                        right: '6px',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        background: 'none',
+                        border: 'none',
+                        color: 'var(--color-critical)',
+                        fontSize: '12px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        width: '14px',
+                        height: '14px',
+                        padding: 0
+                      }}
+                      title="Delete Preset"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              {/* Save Preset Form */}
+              {showSavePresetInput ? (
+                <form onSubmit={handleSavePreset} style={{ display: 'flex', gap: '8px', marginTop: '10px' }}>
+                  <input 
+                    type="text" 
+                    placeholder="Preset Name..." 
+                    value={newPresetName}
+                    onChange={e => setNewPresetName(e.target.value)}
+                    style={{
+                      flex: 1,
+                      padding: '8px 12px',
+                      borderRadius: '8px',
+                      border: '1px solid var(--color-border)',
+                      backgroundColor: 'var(--color-surface)',
+                      color: 'var(--color-text-primary)',
+                      fontFamily: 'var(--font-main)',
+                      fontSize: '12px',
+                      outline: 'none'
+                    }}
+                    maxLength={20}
+                    required
+                  />
+                  <button 
+                    type="submit" 
+                    className="primary-button" 
+                    style={{ padding: '8px 12px', fontSize: '12px', borderRadius: '8px' }}
+                  >
+                    Save
+                  </button>
+                  <button 
+                    type="button" 
+                    className="secondary-button" 
+                    style={{ padding: '8px 12px', fontSize: '12px', borderRadius: '8px' }}
+                    onClick={() => { setShowSavePresetInput(false); setNewPresetName(''); }}
+                  >
+                    Cancel
+                  </button>
+                </form>
+              ) : (
+                <button
+                  className="secondary-button"
+                  style={{
+                    alignSelf: 'flex-start',
+                    padding: '8px 12px',
+                    fontSize: '12px',
+                    borderRadius: '8px',
+                    borderColor: 'var(--color-primary)',
+                    color: 'var(--color-primary-dark)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    marginTop: '8px',
+                    cursor: 'pointer'
+                  }}
+                  onClick={() => setShowSavePresetInput(true)}
+                >
+                  <Plus size={12} style={{ color: 'var(--color-primary)' }} />
+                  <span style={{ color: 'var(--color-primary-dark)' }}>Save Current as Preset</span>
+                </button>
+              )}
+            </div>
+          </div>
         </div>
       )}
 

@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/set-state-in-effect */
 // AppContext.tsx - Global State Context for OceanEyes
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { MockFirestore, subscribeToDb } from '../services/mock_service';
@@ -81,6 +82,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     syncWithDb();
     return subscribeToDb(syncWithDb);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tankId]);
 
   // Synchronize initial live state for active tank
@@ -296,6 +298,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }, 4000);
 
     return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [simulationActive, tankId, fishList, activeTank]);
 
   return (
@@ -336,6 +339,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   );
 };
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useApp = () => {
   const context = useContext(AppContext);
   if (context === undefined) {
