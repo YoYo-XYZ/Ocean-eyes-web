@@ -21,7 +21,8 @@ import {
   ZoomIn,
   ZoomOut,
   Download,
-  Cpu
+  Cpu,
+  LayoutGrid
 } from 'lucide-react'; // Elegant modern icons representing Material equivalents
 
 export const ViewerApp: React.FC = () => {
@@ -209,7 +210,7 @@ const ViewerShell: React.FC = () => {
 
 // ─── HomeScreen Component ───
 const HomeScreen: React.FC = () => {
-  const { activeTank, readings, fishList, alerts, setActiveTab, setSelectedAlertId } = useApp();
+  const { activeTank, readings, fishList, alerts, setActiveTab, setSelectedAlertId, liveState } = useApp();
 
   const latestReading = readings[0] || {
     clarity: 7.8,
@@ -499,6 +500,67 @@ const HomeScreen: React.FC = () => {
               <p style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginTop: '4px' }}>No active safety alarms triggered.</p>
             </div>
           )}
+
+          {/* Connected Camera Feeds widget */}
+          {liveState && liveState.feeds && (
+            <div style={{ marginTop: '8px' }}>
+              <h3 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--color-text-primary)', marginBottom: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span>Connected Feeds ({liveState.feeds.length})</span>
+                <button 
+                  onClick={() => setActiveTab('live')}
+                  style={{ background: 'none', border: 'none', color: 'var(--color-primary)', fontSize: '12px', fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font-main)' }}
+                >
+                  Configure
+                </button>
+              </h3>
+              
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {liveState.feeds.map(feed => (
+                  <div 
+                    key={feed.id} 
+                    className="card-decoration" 
+                    style={{ 
+                      padding: '12px 16px', 
+                      display: 'flex', 
+                      justifyContent: 'space-between', 
+                      alignItems: 'center',
+                      cursor: 'pointer',
+                      borderLeft: feed.id === liveState.selected_feed_id ? '4px solid var(--color-primary)' : '1px solid var(--color-border)',
+                      boxShadow: 'var(--shadow-card)'
+                    }}
+                    onClick={() => {
+                      if (activeTank) {
+                        MockFirestore.switchActiveFeed(activeTank.id, feed.id);
+                        setActiveTab('live');
+                      }
+                    }}
+                  >
+                    <div>
+                      <strong style={{ fontSize: '14px', color: 'var(--color-text-primary)' }}>{feed.name}</strong>
+                      <span style={{ display: 'block', fontSize: '11px', color: 'var(--color-text-secondary)', marginTop: '2px' }}>
+                        {feed.stream_url}
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      {liveState.is_live ? (
+                        <>
+                          <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-secondary)' }}>
+                            🐟 {feed.current_fish_count} · 💧 {feed.current_clarity}
+                          </span>
+                          <span className="live-badge" style={{ animation: 'pulse 1.5s infinite', margin: 0 }} />
+                        </>
+                      ) : (
+                        <>
+                          <span style={{ fontSize: '10px', color: 'var(--color-text-secondary)' }}>Offline</span>
+                          <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: 'var(--color-text-secondary)' }} />
+                        </>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -513,6 +575,12 @@ const LiveScreen: React.FC = () => {
   const [isRecording, setIsRecording] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const [flashActive, setFlashActive] = useState(false);
+
+  // Multi-camera feeds view states
+  const [isGridView, setIsGridView] = useState(false);
+  const [showAddCameraModal, setShowAddCameraModal] = useState(false);
+  const [newCameraName, setNewCameraName] = useState('');
+  const [newCameraUrl, setNewCameraUrl] = useState('');
 
   // Drag and pan states for zoom
   const [isDragging, setIsDragging] = useState(false);
@@ -575,18 +643,24 @@ const LiveScreen: React.FC = () => {
 
   const startStream = () => {
     setIsStreaming(true);
-    // Notify live state change
     if (activeTank) {
-      const key = `live_state_${activeTank.id}`;
-      localStorage.setItem(key, JSON.stringify({
+      const currentLive = MockFirestore.getLiveState(activeTank.id);
+      const updatedFeeds = currentLive.feeds.map(f => ({
+        ...f,
         is_live: true,
-        stream_url: 'rtsp://oceaneyes.iot/live-stream-09',
-        started_at: new Date().toISOString(),
-        last_ping_at: new Date().toISOString(),
-        current_clarity: 7.8,
-        current_fish_count: 10
+        started_at: f.started_at || new Date().toISOString()
       }));
-      window.dispatchEvent(new CustomEvent('oceaneyes_db_update'));
+      const active = updatedFeeds.find(f => f.id === currentLive.selected_feed_id) || updatedFeeds[0];
+      MockFirestore.saveLiveState(activeTank.id, {
+        is_live: true,
+        stream_url: active.stream_url,
+        started_at: active.started_at || new Date().toISOString(),
+        last_ping_at: new Date().toISOString(),
+        current_clarity: active.current_clarity,
+        current_fish_count: active.current_fish_count,
+        selected_feed_id: currentLive.selected_feed_id,
+        feeds: updatedFeeds
+      });
     }
   };
 
@@ -595,22 +669,63 @@ const LiveScreen: React.FC = () => {
     setIsRecording(false);
     setZoomLevel(1.0);
     if (activeTank) {
-      const key = `live_state_${activeTank.id}`;
-      localStorage.setItem(key, JSON.stringify({
+      const currentLive = MockFirestore.getLiveState(activeTank.id);
+      const updatedFeeds = currentLive.feeds.map(f => ({
+        ...f,
+        is_live: false,
+        started_at: null
+      }));
+      MockFirestore.saveLiveState(activeTank.id, {
         is_live: false,
         stream_url: '',
         started_at: null,
         last_ping_at: null,
         current_clarity: 0,
-        current_fish_count: 0
-      }));
-      window.dispatchEvent(new CustomEvent('oceaneyes_db_update'));
+        current_fish_count: 0,
+        selected_feed_id: currentLive.selected_feed_id,
+        feeds: updatedFeeds
+      });
     }
   };
 
   // Re-read from active context live state
-  const stateClarity = isStreaming && liveState?.is_live ? liveState.current_clarity : 0;
-  const stateFish = isStreaming && liveState?.is_live ? liveState.current_fish_count : 0;
+  const feeds = liveState?.feeds || [];
+  const activeFeed = feeds.find(f => f.id === liveState?.selected_feed_id) || feeds[0] || {
+    id: 'feed-main',
+    name: 'Main View',
+    stream_url: 'rtsp://oceaneyes.iot/live-stream-09',
+    is_live: false,
+    started_at: null,
+    current_clarity: 7.8,
+    current_fish_count: 10
+  };
+
+  const stateClarity = isStreaming && liveState?.is_live ? activeFeed.current_clarity : 0;
+  const stateFish = isStreaming && liveState?.is_live ? activeFeed.current_fish_count : 0;
+
+  const handleAddCamera = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCameraName.trim() || !newCameraUrl.trim()) return;
+    if (activeTank) {
+      MockFirestore.addCameraFeed(activeTank.id, newCameraName.trim(), newCameraUrl.trim());
+      setNewCameraName('');
+      setNewCameraUrl('');
+      setShowAddCameraModal(false);
+    }
+  };
+
+  const handleDeleteCamera = (feedId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (activeTank) {
+      MockFirestore.deleteCameraFeed(activeTank.id, feedId);
+    }
+  };
+
+  const handleSwitchFeed = (feedId: string) => {
+    if (activeTank) {
+      MockFirestore.switchActiveFeed(activeTank.id, feedId);
+    }
+  };
 
   const formatTime = (totalSeconds: number) => {
     const mins = Math.floor(totalSeconds / 60);
@@ -849,219 +964,531 @@ Diagnostics:
 
   return (
     <div style={{ padding: '0 20px 30px 20px' }}>
-      <div className="canvas-header" style={{ marginBottom: '24px' }}>
+      <div className="canvas-header" style={{ marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
           <span style={{ fontSize: '12px', color: 'var(--color-text-secondary)', fontWeight: 600, textTransform: 'uppercase' }}>Camera Monitor</span>
           <h1 className="canvas-title" style={{ marginTop: '2px' }}>Live Video Stream</h1>
         </div>
-      </div>
 
-      {/* Simulated Video Frame */}
-      <div 
-        className="live-camera-feed" 
-        style={{ 
-          marginBottom: '24px', 
-          display: 'flex', 
-          justifyContent: 'center', 
-          alignItems: 'center',
-          cursor: zoomLevel > 1.0 ? (isDragging ? 'grabbing' : 'grab') : 'default',
-          userSelect: 'none',
-          touchAction: zoomLevel > 1.0 ? 'none' : 'auto'
-        }}
-        onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUpOrLeave}
-        onMouseLeave={handleMouseUpOrLeave}
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleMouseUpOrLeave}
-      >
-        {isStreaming ? (
-          <>
-            {/* Shutter flash overlay */}
-            <div className={`camera-flash-overlay ${flashActive ? 'flash-active' : ''}`} />
-
-            {/* Live Camera Grid Lines */}
-            <div className="camera-grid" />
-            <div className="camera-scanline" />
-
-            {/* Simulated Live Stream Feed - Aquatic Render */}
-            <div style={{
-              width: '100%',
-              height: '100%',
-              background: 'linear-gradient(180deg, #0F766E 0%, #115E59 50%, #134E4A 100%)',
-              position: 'absolute',
-              overflow: 'hidden',
-              transform: `translate(${panOffset.x}px, ${panOffset.y}px) scale(${zoomLevel})`,
-              transformOrigin: 'center',
-              transition: isDragging ? 'none' : 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
-            }}>
-              {/* Aquatic Floating Plants */}
-              <div style={{ position: 'absolute', top: '10%', left: '10%', fontSize: '48px', opacity: 0.15 }} className="anim-float-1">🌿</div>
-              <div style={{ position: 'absolute', bottom: '15%', right: '12%', fontSize: '64px', opacity: 0.2 }} className="anim-float-2">🍀</div>
-
-              {/* Animated Floating Fish Representing Detected Species */}
-              <div style={{ position: 'absolute', top: '35%', left: '30%', fontSize: '32px' }} className="anim-float-1">🐟</div>
-              <div style={{ position: 'absolute', top: '55%', right: '25%', fontSize: '28px' }} className="anim-float-2">🐠</div>
-              <div style={{ position: 'absolute', bottom: '30%', left: '40%', fontSize: '36px' }} className="anim-float-2">🐡</div>
-
-              {/* Water Wave Line Overlay representing Calibration */}
-              {activeTank?.calibration && (
-                <div style={{
-                  position: 'absolute',
-                  top: `${Math.min(95, Math.max(5, (activeTank.calibration.water_line_y / 240) * 100))}%`,
-                  left: 0,
-                  width: '100%',
-                  height: '2px',
-                  borderTop: '2px dashed rgba(255,255,255,0.4)',
-                  zIndex: 10
-                }}>
-                  <span style={{
-                    position: 'absolute',
-                    right: '10px',
-                    top: '-18px',
-                    fontSize: '9px',
-                    color: 'rgba(255,255,255,0.6)',
-                    background: 'rgba(0,0,0,0.4)',
-                    padding: '2px 6px',
-                    borderRadius: '4px',
-                    fontWeight: 600
-                  }}>
-                    CALIBRATED LINE
-                  </span>
-                </div>
-              )}
-            </div>
-
-            {/* Badges overlay */}
-            <div className="live-overlay-pill" style={{ left: '12px' }}>
-              <div className="live-badge" />
-              <span>LIVE CAM</span>
-            </div>
-
-            <div className="live-overlay-pill" style={{ right: '12px' }}>
-              <span>FPS: 30</span>
-            </div>
-
-            {/* Recording HUD indicator */}
-            {isRecording && (
-              <div className="live-overlay-pill" style={{ left: '50%', transform: 'translateX(-50%)', backgroundColor: 'rgba(239, 68, 68, 0.85)' }}>
-                <div className="recording-dot" />
-                <span>REC {formatTime(recordingSeconds)}</span>
-              </div>
-            )}
-
-            {/* Live Camera Controls Overlay */}
-            <div style={{
-              position: 'absolute',
-              bottom: '12px',
-              right: '12px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              zIndex: 20
-            }}>
-              {/* Zoom Controls */}
-              <div style={{
+        {/* View Mode Toggle */}
+        {isStreaming && (
+          <div style={{
+            display: 'flex',
+            background: 'var(--color-border)',
+            padding: '2px',
+            borderRadius: '10px',
+            gap: '2px'
+          }}>
+            <button
+              onClick={() => setIsGridView(false)}
+              className="secondary-button"
+              style={{
+                padding: '6px 12px',
+                fontSize: '12px',
+                border: 'none',
+                borderRadius: '8px',
+                background: !isGridView ? 'var(--color-surface)' : 'transparent',
+                color: !isGridView ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
+                fontWeight: 600,
+                boxShadow: !isGridView ? '0 1px 3px rgba(0,0,0,0.05)' : 'none',
                 display: 'flex',
                 alignItems: 'center',
-                background: 'rgba(15, 23, 42, 0.75)',
-                backdropFilter: 'blur(8px)',
-                borderRadius: '20px',
-                border: '1px solid rgba(255, 255, 255, 0.15)',
-                padding: '2px 8px',
-                gap: '6px',
-                color: '#FFF',
-                fontSize: '11px',
+                gap: '4px',
+                cursor: 'pointer'
+              }}
+            >
+              <Video size={14} /> Single View
+            </button>
+            <button
+              onClick={() => setIsGridView(true)}
+              className="secondary-button"
+              style={{
+                padding: '6px 12px',
+                fontSize: '12px',
+                border: 'none',
+                borderRadius: '8px',
+                background: isGridView ? 'var(--color-surface)' : 'transparent',
+                color: isGridView ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
                 fontWeight: 600,
-                height: '40px'
-              }}>
-                <button 
-                  onClick={() => setZoomLevel(prev => Math.max(1, prev - 0.5))}
-                  disabled={zoomLevel <= 1}
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    color: zoomLevel <= 1 ? 'rgba(255,255,255,0.3)' : '#FFF',
-                    cursor: zoomLevel <= 1 ? 'not-allowed' : 'pointer',
-                    padding: '4px',
-                    display: 'flex',
-                    alignItems: 'center'
-                  }}
-                  title="Zoom Out"
-                >
-                  <ZoomOut size={14} />
-                </button>
-                <span style={{ minWidth: '32px', textAlign: 'center' }}>{zoomLevel.toFixed(1)}x</span>
-                <button 
-                  onClick={() => setZoomLevel(prev => Math.min(3, prev + 0.5))}
-                  disabled={zoomLevel >= 3}
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    color: zoomLevel >= 3 ? 'rgba(255,255,255,0.3)' : '#FFF',
-                    cursor: zoomLevel >= 3 ? 'not-allowed' : 'pointer',
-                    padding: '4px',
-                    display: 'flex',
-                    alignItems: 'center'
-                  }}
-                  title="Zoom In"
-                >
-                  <ZoomIn size={14} />
-                </button>
-              </div>
-
-              {/* Capture Button */}
-              <button 
-                className="camera-control-btn"
-                onClick={takeSnapshot}
-                title="Capture Snapshot"
-              >
-                <Camera size={16} />
-              </button>
-
-              {/* Record Button */}
-              <button 
-                className={`camera-control-btn ${isRecording ? 'recording-active' : ''}`}
-                onClick={toggleRecording}
-                title={isRecording ? "Stop Recording" : "Start Recording"}
-              >
-                {isRecording ? <Square size={14} /> : <Video size={16} />}
-              </button>
-            </div>
-
-            {/* Bottom-left telemetry badges */}
-            <div style={{
-              position: 'absolute',
-              bottom: '12px',
-              left: '12px',
-              display: 'flex',
-              gap: '12px',
-              zIndex: 10
-            }}>
-              <div style={{ background: 'rgba(15, 23, 42, 0.75)', padding: '6px 12px', borderRadius: '12px', fontSize: '11px', color: '#FFF' }}>
-                <span style={{ color: 'var(--color-text-secondary)', display: 'block' }}>FISH COUNT</span>
-                <strong style={{ fontSize: '14px' }}>{stateFish} detected</strong>
-              </div>
-
-              <div style={{ background: 'rgba(15, 23, 42, 0.75)', padding: '6px 12px', borderRadius: '12px', fontSize: '11px', color: '#FFF' }}>
-                <span style={{ color: 'var(--color-text-secondary)', display: 'block' }}>CLARITY</span>
-                <strong style={{ fontSize: '14px', color: 'var(--color-info)' }}>{stateClarity} / 10</strong>
-              </div>
-            </div>
-          </>
-        ) : (
-          <div style={{ textAlign: 'center', padding: '20px' }}>
-            <span style={{ fontSize: '32px', display: 'block', marginBottom: '8px' }}>🎥</span>
-            <p style={{ color: 'var(--color-text-secondary)', fontSize: '13px', marginBottom: '16px' }}>
-              Camera monitoring feed is idle. Tap start to connect to local RTSP stream.
-            </p>
-            <button className="primary-button" style={{ margin: '0 auto', padding: '10px 20px', fontSize: '14px' }} onClick={startStream}>
-              Connect Stream
+                boxShadow: isGridView ? '0 1px 3px rgba(0,0,0,0.05)' : 'none',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                cursor: 'pointer'
+              }}
+            >
+              <LayoutGrid size={14} /> Grid View
             </button>
           </div>
         )}
       </div>
+
+      {/* Camera Selector Tabs Bar */}
+      {isStreaming && (
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: '16px',
+          gap: '16px',
+          overflowX: 'auto',
+          paddingBottom: '4px'
+        }}>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            {feeds.map(feed => (
+              <div
+                key={feed.id}
+                onClick={() => !isGridView && handleSwitchFeed(feed.id)}
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: '20px',
+                  border: '1px solid var(--color-border)',
+                  background: isGridView 
+                    ? 'rgba(0, 0, 0, 0.02)' 
+                    : (feed.id === activeFeed.id ? 'var(--color-primary-light)' : 'var(--color-surface)'),
+                  color: isGridView
+                    ? 'var(--color-text-secondary)'
+                    : (feed.id === activeFeed.id ? 'var(--color-primary-dark)' : 'var(--color-text-primary)'),
+                  fontSize: '13px',
+                  fontWeight: 600,
+                  cursor: isGridView ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  transition: 'var(--transition-smooth)'
+                }}
+              >
+                <span style={{
+                  width: '6px',
+                  height: '6px',
+                  borderRadius: '50%',
+                  backgroundColor: feed.is_live ? 'var(--color-good)' : 'var(--color-text-secondary)'
+                }} />
+                <span>{feed.name}</span>
+                {feeds.length > 1 && (
+                  <button
+                    onClick={(e) => handleDeleteCamera(feed.id, e)}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: 'var(--color-text-secondary)',
+                      cursor: 'pointer',
+                      fontSize: '12px',
+                      padding: '2px',
+                      display: 'flex',
+                      alignItems: 'center'
+                    }}
+                    title="Delete camera feed"
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
+            ))}
+
+            <button
+              onClick={() => setShowAddCameraModal(true)}
+              className="secondary-button"
+              style={{
+                padding: '6px 12px',
+                fontSize: '12px',
+                borderRadius: '20px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                borderColor: 'var(--color-primary)'
+              }}
+            >
+              <Plus size={14} style={{ color: 'var(--color-primary)' }} />
+              <span style={{ color: 'var(--color-primary-dark)' }}>Add Camera</span>
+            </button>
+          </div>
+
+          {isGridView && (
+            <span style={{ fontSize: '12px', color: 'var(--color-text-secondary)', fontWeight: 600 }}>
+              💡 Click any camera in grid to view fullscreen
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* Viewport Grid vs Single */}
+      {isGridView && isStreaming ? (
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+          gap: '20px',
+          marginBottom: '24px'
+        }}>
+          {feeds.map(feed => (
+            <div
+              key={feed.id}
+              onClick={() => {
+                handleSwitchFeed(feed.id);
+                setIsGridView(false);
+              }}
+              className="live-camera-feed"
+              style={{
+                aspectRatio: '16 / 9',
+                cursor: 'pointer',
+                border: feed.id === activeFeed.id ? '2px solid var(--color-primary)' : '1px solid var(--color-border)',
+                transition: 'var(--transition-smooth)',
+                position: 'relative',
+                width: '100%'
+              }}
+            >
+              {/* Shutter flash overlay */}
+              <div className={`camera-flash-overlay ${flashActive && feed.id === activeFeed.id ? 'flash-active' : ''}`} />
+
+              {/* Live Camera Grid Lines */}
+              <div className="camera-grid" />
+              <div className="camera-scanline" />
+
+              {/* Aquatic Render */}
+              <div style={{
+                width: '100%',
+                height: '100%',
+                background: 'linear-gradient(180deg, #0F766E 0%, #115E59 50%, #134E4A 100%)',
+                position: 'absolute',
+                overflow: 'hidden'
+              }}>
+                <div style={{ position: 'absolute', top: '10%', left: '10%', fontSize: '32px', opacity: 0.15 }}>🌿</div>
+                <div style={{ position: 'absolute', bottom: '15%', right: '12%', fontSize: '42px', opacity: 0.2 }}>🍀</div>
+                <div style={{ position: 'absolute', top: '35%', left: '30%', fontSize: '24px' }}>🐟</div>
+                <div style={{ position: 'absolute', top: '55%', right: '25%', fontSize: '20px' }}>🐠</div>
+                <div style={{ position: 'absolute', bottom: '30%', left: '40%', fontSize: '26px' }}>🐡</div>
+              </div>
+
+              {/* Badge Overlays */}
+              <div className="live-overlay-pill" style={{ left: '8px', top: '8px', padding: '4px 8px', fontSize: '10px' }}>
+                <div className="live-badge" />
+                <span>{feed.name}</span>
+              </div>
+
+              <div style={{
+                position: 'absolute',
+                bottom: '8px',
+                left: '8px',
+                display: 'flex',
+                gap: '8px',
+                zIndex: 10
+              }}>
+                <div style={{ background: 'rgba(15, 23, 42, 0.85)', padding: '4px 8px', borderRadius: '8px', fontSize: '10px', color: '#FFF' }}>
+                  <strong>{feed.current_fish_count} fish</strong>
+                </div>
+                <div style={{ background: 'rgba(15, 23, 42, 0.85)', padding: '4px 8px', borderRadius: '8px', fontSize: '10px', color: '#FFF' }}>
+                  <strong style={{ color: 'var(--color-info)' }}>{feed.current_clarity} score</strong>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        /* Simulated Video Frame */
+        <div 
+          className="live-camera-feed" 
+          style={{ 
+            marginBottom: '24px', 
+            display: 'flex', 
+            justifyContent: 'center', 
+            alignItems: 'center',
+            cursor: zoomLevel > 1.0 ? (isDragging ? 'grabbing' : 'grab') : 'default',
+            userSelect: 'none',
+            touchAction: zoomLevel > 1.0 ? 'none' : 'auto'
+          }}
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUpOrLeave}
+          onMouseLeave={handleMouseUpOrLeave}
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleMouseUpOrLeave}
+        >
+          {isStreaming ? (
+            <>
+              {/* Shutter flash overlay */}
+              <div className={`camera-flash-overlay ${flashActive ? 'flash-active' : ''}`} />
+
+              {/* Live Camera Grid Lines */}
+              <div className="camera-grid" />
+              <div className="camera-scanline" />
+
+              {/* Simulated Live Stream Feed - Aquatic Render */}
+              <div style={{
+                width: '100%',
+                height: '100%',
+                background: 'linear-gradient(180deg, #0F766E 0%, #115E59 50%, #134E4A 100%)',
+                position: 'absolute',
+                overflow: 'hidden',
+                transform: `translate(${panOffset.x}px, ${panOffset.y}px) scale(${zoomLevel})`,
+                transformOrigin: 'center',
+                transition: isDragging ? 'none' : 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+              }}>
+                {/* Aquatic Floating Plants */}
+                <div style={{ position: 'absolute', top: '10%', left: '10%', fontSize: '48px', opacity: 0.15 }} className="anim-float-1">🌿</div>
+                <div style={{ position: 'absolute', bottom: '15%', right: '12%', fontSize: '64px', opacity: 0.2 }} className="anim-float-2">🍀</div>
+
+                {/* Animated Floating Fish Representing Detected Species */}
+                <div style={{ position: 'absolute', top: '35%', left: '30%', fontSize: '32px' }} className="anim-float-1">🐟</div>
+                <div style={{ position: 'absolute', top: '55%', right: '25%', fontSize: '28px' }} className="anim-float-2">🐠</div>
+                <div style={{ position: 'absolute', bottom: '30%', left: '40%', fontSize: '36px' }} className="anim-float-2">🐡</div>
+
+                {/* Water Wave Line Overlay representing Calibration */}
+                {activeTank?.calibration && (
+                  <div style={{
+                    position: 'absolute',
+                    top: `${Math.min(95, Math.max(5, (activeTank.calibration.water_line_y / 240) * 100))}%`,
+                    left: 0,
+                    width: '100%',
+                    height: '2px',
+                    borderTop: '2px dashed rgba(255,255,255,0.4)',
+                    zIndex: 10
+                  }}>
+                    <span style={{
+                      position: 'absolute',
+                      right: '10px',
+                      top: '-18px',
+                      fontSize: '9px',
+                      color: 'rgba(255,255,255,0.6)',
+                      background: 'rgba(0,0,0,0.4)',
+                      padding: '2px 6px',
+                      borderRadius: '4px',
+                      fontWeight: 600
+                    }}>
+                      CALIBRATED LINE
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* Badges overlay */}
+              <div className="live-overlay-pill" style={{ left: '12px' }}>
+                <div className="live-badge" />
+                <span>{activeFeed.name} (LIVE)</span>
+              </div>
+
+              <div className="live-overlay-pill" style={{ right: '12px' }}>
+                <span>FPS: 30</span>
+              </div>
+
+              {/* Recording HUD indicator */}
+              {isRecording && (
+                <div className="live-overlay-pill" style={{ left: '50%', transform: 'translateX(-50%)', backgroundColor: 'rgba(239, 68, 68, 0.85)' }}>
+                  <div className="recording-dot" />
+                  <span>REC {formatTime(recordingSeconds)}</span>
+                </div>
+              )}
+
+              {/* Live Camera Controls Overlay */}
+              <div style={{
+                position: 'absolute',
+                bottom: '12px',
+                right: '12px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                zIndex: 20
+              }}>
+                {/* Zoom Controls */}
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  background: 'rgba(15, 23, 42, 0.75)',
+                  backdropFilter: 'blur(8px)',
+                  borderRadius: '20px',
+                  border: '1px solid rgba(255, 255, 255, 0.15)',
+                  padding: '2px 8px',
+                  gap: '6px',
+                  color: '#FFF',
+                  fontSize: '11px',
+                  fontWeight: 600,
+                  height: '40px'
+                }}>
+                  <button 
+                    onClick={() => setZoomLevel(prev => Math.max(1, prev - 0.5))}
+                    disabled={zoomLevel <= 1}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: zoomLevel <= 1 ? 'rgba(255,255,255,0.3)' : '#FFF',
+                      cursor: zoomLevel <= 1 ? 'not-allowed' : 'pointer',
+                      padding: '4px',
+                      display: 'flex',
+                      alignItems: 'center'
+                    }}
+                    title="Zoom Out"
+                  >
+                    <ZoomOut size={14} />
+                  </button>
+                  <span style={{ minWidth: '32px', textAlign: 'center' }}>{zoomLevel.toFixed(1)}x</span>
+                  <button 
+                    onClick={() => setZoomLevel(prev => Math.min(3, prev + 0.5))}
+                    disabled={zoomLevel >= 3}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: zoomLevel >= 3 ? 'rgba(255,255,255,0.3)' : '#FFF',
+                      cursor: zoomLevel >= 3 ? 'not-allowed' : 'pointer',
+                      padding: '4px',
+                      display: 'flex',
+                      alignItems: 'center'
+                    }}
+                    title="Zoom In"
+                  >
+                    <ZoomIn size={14} />
+                  </button>
+                </div>
+
+                {/* Capture Button */}
+                <button 
+                  className="camera-control-btn"
+                  onClick={takeSnapshot}
+                  title="Capture Snapshot"
+                >
+                  <Camera size={16} />
+                </button>
+
+                {/* Record Button */}
+                <button 
+                  className={`camera-control-btn ${isRecording ? 'recording-active' : ''}`}
+                  onClick={toggleRecording}
+                  title={isRecording ? "Stop Recording" : "Start Recording"}
+                >
+                  {isRecording ? <Square size={14} /> : <Video size={16} />}
+                </button>
+              </div>
+
+              {/* Bottom-left telemetry badges */}
+              <div style={{
+                position: 'absolute',
+                bottom: '12px',
+                left: '12px',
+                display: 'flex',
+                gap: '12px',
+                zIndex: 10
+              }}>
+                <div style={{ background: 'rgba(15, 23, 42, 0.75)', padding: '6px 12px', borderRadius: '12px', fontSize: '11px', color: '#FFF' }}>
+                  <span style={{ color: 'var(--color-text-secondary)', display: 'block' }}>FISH COUNT</span>
+                  <strong style={{ fontSize: '14px' }}>{stateFish} detected</strong>
+                </div>
+
+                <div style={{ background: 'rgba(15, 23, 42, 0.75)', padding: '6px 12px', borderRadius: '12px', fontSize: '11px', color: '#FFF' }}>
+                  <span style={{ color: 'var(--color-text-secondary)', display: 'block' }}>CLARITY</span>
+                  <strong style={{ fontSize: '14px', color: 'var(--color-info)' }}>{stateClarity} / 10</strong>
+                </div>
+              </div>
+            </>
+          ) : (
+            <div style={{ textAlign: 'center', padding: '20px' }}>
+              <span style={{ fontSize: '32px', display: 'block', marginBottom: '8px' }}>🎥</span>
+              <p style={{ color: 'var(--color-text-secondary)', fontSize: '13px', marginBottom: '16px' }}>
+                Camera monitoring feed is idle. Tap start to connect to local RTSP stream.
+              </p>
+              <button className="primary-button" style={{ margin: '0 auto', padding: '10px 20px', fontSize: '14px' }} onClick={startStream}>
+                Connect Stream
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Add Camera Modal Dialog */}
+      {showAddCameraModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100%',
+          backgroundColor: 'rgba(15, 23, 42, 0.6)',
+          backdropFilter: 'blur(4px)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 1000
+        }}>
+          <form 
+            onSubmit={handleAddCamera}
+            className="card-decoration" 
+            style={{ 
+              padding: '24px', 
+              width: '400px', 
+              display: 'flex', 
+              flexDirection: 'column', 
+              gap: '16px',
+              boxShadow: '0 20px 25px -5px rgba(0,0,0,0.15)'
+            }}
+          >
+            <h3 style={{ fontSize: '16px', fontWeight: 700, margin: 0, color: 'var(--color-text-primary)' }}>Add New Camera Feed</h3>
+            
+            <div>
+              <label style={{ display: 'block', fontSize: '11px', color: 'var(--color-text-secondary)', marginBottom: '4px', fontWeight: 600 }}>CAMERA NAME</label>
+              <input 
+                type="text" 
+                placeholder="e.g. Filter View" 
+                value={newCameraName}
+                onChange={e => setNewCameraName(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '8px 12px',
+                  borderRadius: '10px',
+                  border: '1px solid var(--color-border)',
+                  outline: 'none',
+                  fontFamily: 'var(--font-main)',
+                  fontSize: '13px',
+                  backgroundColor: 'var(--color-surface)',
+                  color: 'var(--color-text-primary)'
+                }}
+                required
+              />
+            </div>
+
+            <div>
+              <label style={{ display: 'block', fontSize: '11px', color: 'var(--color-text-secondary)', marginBottom: '4px', fontWeight: 600 }}>RTSP STREAM URL</label>
+              <input 
+                type="text" 
+                placeholder="rtsp://oceaneyes.iot/..." 
+                value={newCameraUrl}
+                onChange={e => setNewCameraUrl(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '8px 12px',
+                  borderRadius: '10px',
+                  border: '1px solid var(--color-border)',
+                  outline: 'none',
+                  fontFamily: 'var(--font-main)',
+                  fontSize: '13px',
+                  backgroundColor: 'var(--color-surface)',
+                  color: 'var(--color-text-primary)'
+                }}
+                required
+              />
+            </div>
+
+            <div style={{ display: 'flex', gap: '10px', marginTop: '8px' }}>
+              <button 
+                type="button"
+                className="secondary-button" 
+                style={{ flex: 1, padding: '10px', fontSize: '13px', borderRadius: '10px' }}
+                onClick={() => {
+                  setShowAddCameraModal(false);
+                  setNewCameraName('');
+                  setNewCameraUrl('');
+                }}
+              >
+                Cancel
+              </button>
+              <button 
+                type="submit"
+                className="primary-button" 
+                style={{ flex: 1, padding: '10px', fontSize: '13px', borderRadius: '10px' }}
+              >
+                Add Camera
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
 
       {isStreaming && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>

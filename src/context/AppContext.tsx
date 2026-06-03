@@ -251,19 +251,36 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       // Simulate live streaming ping
       const currentStreamState = MockFirestore.getLiveState(tankId);
       if (currentStreamState.is_live) {
-        // Modulate live stats
-        const currentClarity = parseFloat((7.2 + Math.random() * 1.5).toFixed(1));
-        const totalExpectedFish = fishList.reduce((sum, f) => sum + f.count, 0);
-        const randomFishOffset = Math.random() > 0.85 ? -1 : (Math.random() > 0.9 ? 1 : 0);
-        const simulatedDetected = Math.max(0, totalExpectedFish + randomFishOffset);
+        // Modulate live stats for all camera feeds
+        const updatedFeeds = currentStreamState.feeds.map(feed => {
+          const clarityOffset = (Math.random() - 0.5) * 0.4;
+          const currentClarity = parseFloat((feed.current_clarity + clarityOffset).toFixed(1));
+          
+          const totalExpectedFish = fishList.reduce((sum, f) => sum + f.count, 0);
+          const randomFishOffset = Math.random() > 0.85 ? -1 : (Math.random() > 0.9 ? 1 : 0);
+          const simulatedDetected = Math.max(0, totalExpectedFish + randomFishOffset);
+          
+          return {
+            ...feed,
+            is_live: true,
+            started_at: feed.started_at || new Date().toISOString(),
+            current_clarity: Math.max(1.0, Math.min(10.0, currentClarity)),
+            current_fish_count: simulatedDetected
+          };
+        });
+
+        // Find the active feed and update top-level stats
+        const activeFeed = updatedFeeds.find(f => f.id === currentStreamState.selected_feed_id) || updatedFeeds[0];
 
         MockFirestore.saveLiveState(tankId, {
           is_live: true,
-          stream_url: currentStreamState.stream_url,
-          started_at: currentStreamState.started_at,
+          stream_url: activeFeed.stream_url,
+          started_at: activeFeed.started_at,
           last_ping_at: new Date().toISOString(),
-          current_clarity: currentClarity,
-          current_fish_count: simulatedDetected
+          current_clarity: activeFeed.current_clarity,
+          current_fish_count: activeFeed.current_fish_count,
+          selected_feed_id: currentStreamState.selected_feed_id,
+          feeds: updatedFeeds
         });
       }
 

@@ -47,6 +47,16 @@ export interface ReadingItem {
   nitrite: number;
 }
 
+export interface CameraFeed {
+  id: string;
+  name: string;
+  stream_url: string;
+  is_live: boolean;
+  started_at: string | null;
+  current_clarity: number;
+  current_fish_count: number;
+}
+
 export interface LiveState {
   is_live: boolean;
   stream_url: string;
@@ -54,6 +64,8 @@ export interface LiveState {
   last_ping_at: string | null;
   current_clarity: number;
   current_fish_count: number;
+  selected_feed_id: string;
+  feeds: CameraFeed[];
 }
 
 export interface TankBrief {
@@ -193,11 +205,41 @@ export class MockFirestore {
     const key = `live_state_${tankId}`;
     const defaultState: LiveState = {
       is_live: false,
-      stream_url: '',
+      stream_url: 'rtsp://oceaneyes.iot/live-stream-09',
       started_at: null,
       last_ping_at: null,
       current_clarity: 7.8,
-      current_fish_count: 10
+      current_fish_count: 10,
+      selected_feed_id: 'feed-main',
+      feeds: [
+        {
+          id: 'feed-main',
+          name: 'Main View',
+          stream_url: 'rtsp://oceaneyes.iot/live-stream-09',
+          is_live: false,
+          started_at: null,
+          current_clarity: 7.8,
+          current_fish_count: 10
+        },
+        {
+          id: 'feed-angle',
+          name: 'Angle View',
+          stream_url: 'rtsp://oceaneyes.iot/angle-stream-02',
+          is_live: false,
+          started_at: null,
+          current_clarity: 8.2,
+          current_fish_count: 8
+        },
+        {
+          id: 'feed-mobile',
+          name: 'Mobile Feed',
+          stream_url: 'rtsp://oceaneyes.iot/mobile-stream-05',
+          is_live: false,
+          started_at: null,
+          current_clarity: 7.5,
+          current_fish_count: 9
+        }
+      ]
     };
     return getOrSet(key, defaultState);
   };
@@ -205,6 +247,50 @@ export class MockFirestore {
   static saveLiveState = (tankId: string, state: LiveState) => {
     localStorage.setItem(`live_state_${tankId}`, JSON.stringify(state));
     notifyUpdate();
+  };
+
+  static addCameraFeed = (tankId: string, name: string, streamUrl: string) => {
+    const liveState = this.getLiveState(tankId);
+    const newFeed: CameraFeed = {
+      id: `feed-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      name,
+      stream_url: streamUrl,
+      is_live: liveState.is_live,
+      started_at: liveState.is_live ? new Date().toISOString() : null,
+      current_clarity: parseFloat((7.0 + Math.random() * 2.0).toFixed(1)),
+      current_fish_count: Math.floor(Math.random() * 5) + 5
+    };
+    liveState.feeds.push(newFeed);
+    this.saveLiveState(tankId, liveState);
+  };
+
+  static deleteCameraFeed = (tankId: string, feedId: string) => {
+    const liveState = this.getLiveState(tankId);
+    if (liveState.feeds.length <= 1) return; // Must have at least one feed
+    
+    liveState.feeds = liveState.feeds.filter(f => f.id !== feedId);
+    if (liveState.selected_feed_id === feedId) {
+      liveState.selected_feed_id = liveState.feeds[0].id;
+      const activeFeed = liveState.feeds[0];
+      liveState.stream_url = activeFeed.stream_url;
+      liveState.current_clarity = activeFeed.current_clarity;
+      liveState.current_fish_count = activeFeed.current_fish_count;
+      liveState.started_at = activeFeed.started_at;
+    }
+    this.saveLiveState(tankId, liveState);
+  };
+
+  static switchActiveFeed = (tankId: string, feedId: string) => {
+    const liveState = this.getLiveState(tankId);
+    const activeFeed = liveState.feeds.find(f => f.id === feedId);
+    if (activeFeed) {
+      liveState.selected_feed_id = feedId;
+      liveState.stream_url = activeFeed.stream_url;
+      liveState.current_clarity = activeFeed.current_clarity;
+      liveState.current_fish_count = activeFeed.current_fish_count;
+      liveState.started_at = activeFeed.started_at;
+      this.saveLiveState(tankId, liveState);
+    }
   };
 
   // ─── Tank Operations ─────────────────────────────────────────────────────────
