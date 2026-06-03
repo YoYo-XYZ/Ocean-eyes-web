@@ -210,7 +210,7 @@ const ViewerShell: React.FC = () => {
 
 // ─── HomeScreen Component ───
 const HomeScreen: React.FC = () => {
-  const { activeTank, readings, fishList, alerts, setActiveTab, setSelectedAlertId, liveState } = useApp();
+  const { activeTank, readings, fishList, alerts, setActiveTab, setSelectedAlertId, liveState, tanks, linkedTanks, tankId, selectTank } = useApp();
 
   const latestReading = readings[0] || {
     clarity: 7.8,
@@ -299,7 +299,34 @@ const HomeScreen: React.FC = () => {
       <div className="canvas-header">
         <div>
           <span style={{ fontSize: '12px', color: 'var(--color-text-secondary)', fontWeight: 600, textTransform: 'uppercase' }}>My Aquarium</span>
-          <h1 className="canvas-title" style={{ marginTop: '2px' }}>{activeTank?.name || 'Living Room Reef'}</h1>
+          {linkedTanks.length > 1 ? (
+            <select
+              value={tankId || ''}
+              onChange={(e) => selectTank(e.target.value)}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: 'var(--color-text-primary)',
+                fontFamily: 'var(--font-main)',
+                fontSize: '28px',
+                fontWeight: 800,
+                outline: 'none',
+                cursor: 'pointer',
+                padding: 0,
+                marginTop: '2px',
+                maxWidth: '100%',
+                display: 'block'
+              }}
+            >
+              {tanks.filter(t => linkedTanks.includes(t.id)).map(t => (
+                <option key={t.id} value={t.id} style={{ fontSize: '14px', fontWeight: 600, backgroundColor: 'var(--color-surface)' }}>
+                  {t.name}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <h1 className="canvas-title" style={{ marginTop: '2px' }}>{activeTank?.name || 'Living Room Reef'}</h1>
+          )}
         </div>
         
         {activeAlertCount > 0 && (

@@ -103,6 +103,14 @@ const SEED_TANKS: TankBrief[] = [
     created_at: new Date().toISOString(),
     thresholds: { clarity_min: 6.0, fish_change_pct: 50.0 },
     calibration: { water_line_y: 120 }
+  },
+  {
+    id: 'office-reef-55',
+    name: 'Office Nano Reef',
+    owner_id: 'anon-user-123',
+    created_at: new Date().toISOString(),
+    thresholds: { clarity_min: 7.0, fish_change_pct: 40.0 },
+    calibration: { water_line_y: 100 }
   }
 ];
 
@@ -362,7 +370,7 @@ export class MockFirestore {
     if (!found) return false;
 
     // Save in user linked tanks
-    const userTanks = getOrSet<string[]>('user_tanks', ['living-room-tank-77']);
+    const userTanks = getOrSet<string[]>('user_tanks', ['living-room-tank-77', 'office-reef-55']);
     if (!userTanks.includes(tankId)) {
       userTanks.push(tankId);
       localStorage.setItem('user_tanks', JSON.stringify(userTanks));
@@ -372,7 +380,7 @@ export class MockFirestore {
   }
 
   static getLinkedTanks(): string[] {
-    return getOrSet<string[]>('user_tanks', ['living-room-tank-77']);
+    return getOrSet<string[]>('user_tanks', ['living-room-tank-77', 'office-reef-55']);
   }
 
   static unlinkTank(tankId: string) {

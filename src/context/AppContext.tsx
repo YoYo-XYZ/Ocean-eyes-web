@@ -20,6 +20,7 @@ interface AppContextProps {
   alerts: AlertItem[];
   liveState: LiveState | null;
   linkTank: (tankId: string) => Promise<boolean>;
+  selectTank: (tankId: string) => void;
   unlinkTank: () => void;
   createAndLinkTank: (name: string) => Promise<string>;
   addFish: (name: string, emoji: string, count: number) => void;
@@ -90,6 +91,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setLiveState(null);
     }
   }, [tankId]);
+
+  const selectTank = (id: string) => {
+    setTankId(id);
+  };
 
   // Operations
   const linkTank = async (targetId: string): Promise<boolean> => {
@@ -308,6 +313,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         readings,
         alerts,
         liveState,
+        selectTank,
         linkTank,
         unlinkTank,
         createAndLinkTank,
