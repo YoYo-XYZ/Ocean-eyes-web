@@ -186,7 +186,31 @@ const getOrSet = <T>(key: string, seed: T): T => {
 
 export class MockFirestore {
   // Local storage lists
-  static getTanks = (): TankBrief[] => getOrSet('tanks', SEED_TANKS);
+  static getTanks = (): TankBrief[] => {
+    const defaultTanks = SEED_TANKS;
+    const stored = localStorage.getItem('tanks');
+    if (!stored) {
+      localStorage.setItem('tanks', JSON.stringify(defaultTanks));
+      return defaultTanks;
+    }
+    try {
+      const parsed = JSON.parse(stored) as TankBrief[];
+      let updated = false;
+      defaultTanks.forEach(dt => {
+        if (!parsed.some(t => t.id === dt.id)) {
+          parsed.push(dt);
+          updated = true;
+        }
+      });
+      if (updated) {
+        localStorage.setItem('tanks', JSON.stringify(parsed));
+      }
+      return parsed;
+    } catch (e) {
+      localStorage.setItem('tanks', JSON.stringify(defaultTanks));
+      return defaultTanks;
+    }
+  };
   static saveTanks = (tanks: TankBrief[]) => {
     localStorage.setItem('tanks', JSON.stringify(tanks));
     notifyUpdate();
@@ -380,7 +404,29 @@ export class MockFirestore {
   }
 
   static getLinkedTanks(): string[] {
-    return getOrSet<string[]>('user_tanks', ['living-room-tank-77', 'office-reef-55']);
+    const defaultLinked = ['living-room-tank-77', 'office-reef-55'];
+    const stored = localStorage.getItem('user_tanks');
+    if (!stored) {
+      localStorage.setItem('user_tanks', JSON.stringify(defaultLinked));
+      return defaultLinked;
+    }
+    try {
+      const parsed = JSON.parse(stored) as string[];
+      let updated = false;
+      defaultLinked.forEach(id => {
+        if (!parsed.includes(id)) {
+          parsed.push(id);
+          updated = true;
+        }
+      });
+      if (updated) {
+        localStorage.setItem('user_tanks', JSON.stringify(parsed));
+      }
+      return parsed;
+    } catch (e) {
+      localStorage.setItem('user_tanks', JSON.stringify(defaultLinked));
+      return defaultLinked;
+    }
   }
 
   static unlinkTank(tankId: string) {
