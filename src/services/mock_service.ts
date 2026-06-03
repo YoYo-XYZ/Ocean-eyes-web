@@ -55,6 +55,7 @@ export interface CameraFeed {
   started_at: string | null;
   current_clarity: number;
   current_fish_count: number;
+  mock_image?: string;
 }
 
 export interface LiveState {
@@ -219,7 +220,8 @@ export class MockFirestore {
           is_live: false,
           started_at: null,
           current_clarity: 7.8,
-          current_fish_count: 10
+          current_fish_count: 10,
+          mock_image: '/mock_camera_main.png'
         },
         {
           id: 'feed-angle',
@@ -228,7 +230,8 @@ export class MockFirestore {
           is_live: false,
           started_at: null,
           current_clarity: 8.2,
-          current_fish_count: 8
+          current_fish_count: 8,
+          mock_image: '/mock_camera_angle.png'
         },
         {
           id: 'feed-mobile',
@@ -237,7 +240,8 @@ export class MockFirestore {
           is_live: false,
           started_at: null,
           current_clarity: 7.5,
-          current_fish_count: 9
+          current_fish_count: 9,
+          mock_image: '/mock_camera_mobile.png'
         }
       ]
     };
@@ -258,7 +262,8 @@ export class MockFirestore {
       is_live: liveState.is_live,
       started_at: liveState.is_live ? new Date().toISOString() : null,
       current_clarity: parseFloat((7.0 + Math.random() * 2.0).toFixed(1)),
-      current_fish_count: Math.floor(Math.random() * 5) + 5
+      current_fish_count: Math.floor(Math.random() * 5) + 5,
+      mock_image: '/mock_camera_custom.png'
     };
     liveState.feeds.push(newFeed);
     this.saveLiveState(tankId, liveState);

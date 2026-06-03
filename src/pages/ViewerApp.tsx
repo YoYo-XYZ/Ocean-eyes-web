@@ -801,110 +801,130 @@ const LiveScreen: React.FC = () => {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // 1. Gradient Background
-    const grad = ctx.createLinearGradient(0, 0, 0, 360);
-    grad.addColorStop(0, '#0F766E');
-    grad.addColorStop(0.5, '#115E59');
-    grad.addColorStop(1, '#134E4A');
-    ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, 640, 360);
+    const renderAllToCanvas = (bgImg?: HTMLImageElement) => {
+      // 1. Draw Background (mock image or gradient)
+      if (bgImg) {
+        ctx.drawImage(bgImg, 0, 0, 640, 360);
+      } else {
+        const grad = ctx.createLinearGradient(0, 0, 0, 360);
+        grad.addColorStop(0, '#0F766E');
+        grad.addColorStop(0.5, '#115E59');
+        grad.addColorStop(1, '#134E4A');
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, 640, 360);
+      }
 
-    // 2. Camera Grid Overlay
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.04)';
-    ctx.lineWidth = 1;
-    for (let x = 0; x < 640; x += 40) {
-      ctx.beginPath();
-      ctx.moveTo(x, 0);
-      ctx.lineTo(x, 360);
-      ctx.stroke();
-    }
-    for (let y = 0; y < 360; y += 40) {
-      ctx.beginPath();
-      ctx.moveTo(0, y);
-      ctx.lineTo(640, y);
-      ctx.stroke();
-    }
+      // 2. Camera Grid Overlay
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.04)';
+      ctx.lineWidth = 1;
+      for (let x = 0; x < 640; x += 40) {
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, 360);
+        ctx.stroke();
+      }
+      for (let y = 0; y < 360; y += 40) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(640, y);
+        ctx.stroke();
+      }
 
-    // 3. Zoom-scaled items
-    ctx.save();
-    ctx.translate(panOffset.x, panOffset.y);
-    ctx.translate(320, 180);
-    ctx.scale(zoomLevel, zoomLevel);
-    ctx.translate(-320, -180);
+      // 3. Zoom-scaled items
+      ctx.save();
+      ctx.translate(panOffset.x, panOffset.y);
+      ctx.translate(320, 180);
+      ctx.scale(zoomLevel, zoomLevel);
+      ctx.translate(-320, -180);
 
-    // Aquatic Emoji Elements
-    ctx.font = '36px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('🌿', 80, 60);
-    ctx.fillText('🍀', 560, 280);
+      // Aquatic Emoji Elements
+      ctx.font = '36px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('🌿', 80, 60);
+      ctx.fillText('🍀', 560, 280);
 
-    ctx.fillText('🐟', 200, 140);
-    ctx.fillText('🐠', 460, 200);
-    ctx.fillText('🐡', 280, 260);
+      ctx.fillText('🐟', 200, 140);
+      ctx.fillText('🐠', 460, 200);
+      ctx.fillText('🐡', 280, 260);
 
-    // Calibrated water line
-    if (activeTank?.calibration) {
-      const yPercent = activeTank.calibration.water_line_y / 240;
-      const canvasY = yPercent * 360;
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
-      ctx.lineWidth = 2;
-      ctx.setLineDash([4, 4]);
-      ctx.beginPath();
-      ctx.moveTo(0, canvasY);
-      ctx.lineTo(640, canvasY);
-      ctx.stroke();
-      ctx.setLineDash([]);
-      
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
-      ctx.font = 'bold 9px monospace';
-      ctx.fillText('CALIBRATED WATER LINE', 520, canvasY - 10);
-    }
-    ctx.restore();
+      // Calibrated water line
+      if (activeTank?.calibration) {
+        const yPercent = activeTank.calibration.water_line_y / 240;
+        const canvasY = yPercent * 360;
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([4, 4]);
+        ctx.beginPath();
+        ctx.moveTo(0, canvasY);
+        ctx.lineTo(640, canvasY);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+        ctx.font = 'bold 9px monospace';
+        ctx.fillText('CALIBRATED WATER LINE', 520, canvasY - 10);
+      }
+      ctx.restore();
 
-    // 4. Overlays (Static HUD)
-    if (isRecording) {
-      ctx.fillStyle = 'rgba(239, 68, 68, 0.85)';
-      ctx.beginPath();
-      ctx.arc(30, 25, 6, 0, 2 * Math.PI);
-      ctx.fill();
+      // 4. Overlays (Static HUD)
+      if (isRecording) {
+        ctx.fillStyle = 'rgba(239, 68, 68, 0.85)';
+        ctx.beginPath();
+        ctx.arc(30, 25, 6, 0, 2 * Math.PI);
+        ctx.fill();
+
+        ctx.fillStyle = '#FFFFFF';
+        ctx.font = 'bold 11px monospace';
+        ctx.textAlign = 'left';
+        ctx.fillText(`REC ${formatTime(recordingSeconds)}`, 42, 25);
+      }
+
+      // Live Cam Pill
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.6)';
+      ctx.fillRect(520, 15, 100, 22);
+      ctx.fillStyle = '#FFFFFF';
+      ctx.font = 'bold 9px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(`LIVE CAM (FPS:30)`, 570, 26);
+
+      // 5. Diagnostics Overlay
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
+      ctx.fillRect(0, 310, 640, 50);
 
       ctx.fillStyle = '#FFFFFF';
-      ctx.font = 'bold 11px monospace';
+      ctx.font = '10px Outfit, Inter, sans-serif';
       ctx.textAlign = 'left';
-      ctx.fillText(`REC ${formatTime(recordingSeconds)}`, 42, 25);
-    }
+      ctx.fillText(`OCEANEYES AI DIAGNOSTICS`, 20, 335);
 
-    // Live Cam Pill
-    ctx.fillStyle = 'rgba(15, 23, 42, 0.6)';
-    ctx.fillRect(520, 15, 100, 22);
-    ctx.fillStyle = '#FFFFFF';
-    ctx.font = 'bold 9px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText(`LIVE CAM (FPS:30)`, 570, 26);
+      ctx.textAlign = 'right';
+      ctx.fillStyle = '#E2E8F0';
+      ctx.fillText(`FISH: ${stateFish} DETECTED  |  CLARITY: ${stateClarity}/10  |  ZOOM: ${zoomLevel.toFixed(1)}x`, 620, 335);
 
-    // 5. Diagnostics Overlay
-    ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
-    ctx.fillRect(0, 310, 640, 50);
-
-    ctx.fillStyle = '#FFFFFF';
-    ctx.font = '10px Outfit, Inter, sans-serif';
-    ctx.textAlign = 'left';
-    ctx.fillText(`OCEANEYES AI DIAGNOSTICS`, 20, 335);
-
-    ctx.textAlign = 'right';
-    ctx.fillStyle = '#E2E8F0';
-    ctx.fillText(`FISH: ${stateFish} DETECTED  |  CLARITY: ${stateClarity}/10  |  ZOOM: ${zoomLevel.toFixed(1)}x`, 620, 335);
-
-    const imgUrl = canvas.toDataURL('image/png');
-    const newSnapshot = {
-      id: `snap_${Date.now()}`,
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
-      imageUrl: imgUrl,
-      fishCount: stateFish,
-      clarity: stateClarity
+      const imgUrl = canvas.toDataURL('image/png');
+      const newSnapshot = {
+        id: `snap_${Date.now()}`,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+        imageUrl: imgUrl,
+        fishCount: stateFish,
+        clarity: stateClarity
+      };
+      setSnapshots(prev => [newSnapshot, ...prev]);
     };
-    setSnapshots(prev => [newSnapshot, ...prev]);
+
+    if (activeFeed.mock_image) {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => {
+        renderAllToCanvas(img);
+      };
+      img.onerror = () => {
+        renderAllToCanvas();
+      };
+      img.src = activeFeed.mock_image;
+    } else {
+      renderAllToCanvas();
+    }
   };
 
   const downloadSnapshot = (snap: { id: string; imageUrl: string }) => {
@@ -1148,15 +1168,17 @@ Diagnostics:
               <div style={{
                 width: '100%',
                 height: '100%',
-                background: 'linear-gradient(180deg, #0F766E 0%, #115E59 50%, #134E4A 100%)',
+                backgroundImage: feed.mock_image ? `url(${feed.mock_image})` : 'linear-gradient(180deg, #0F766E 0%, #115E59 50%, #134E4A 100%)',
+                backgroundSize: 'cover',
+                backgroundPosition: 'center',
                 position: 'absolute',
                 overflow: 'hidden'
               }}>
-                <div style={{ position: 'absolute', top: '10%', left: '10%', fontSize: '32px', opacity: 0.15 }}>🌿</div>
-                <div style={{ position: 'absolute', bottom: '15%', right: '12%', fontSize: '42px', opacity: 0.2 }}>🍀</div>
-                <div style={{ position: 'absolute', top: '35%', left: '30%', fontSize: '24px' }}>🐟</div>
-                <div style={{ position: 'absolute', top: '55%', right: '25%', fontSize: '20px' }}>🐠</div>
-                <div style={{ position: 'absolute', bottom: '30%', left: '40%', fontSize: '26px' }}>🐡</div>
+                <div style={{ position: 'absolute', top: '10%', left: '10%', fontSize: '32px', opacity: 0.2 }}>🌿</div>
+                <div style={{ position: 'absolute', bottom: '15%', right: '12%', fontSize: '42px', opacity: 0.25 }}>🍀</div>
+                <div style={{ position: 'absolute', top: '35%', left: '30%', fontSize: '24px', textShadow: '0 2px 4px rgba(0,0,0,0.5)' }}>🐟</div>
+                <div style={{ position: 'absolute', top: '55%', right: '25%', fontSize: '20px', textShadow: '0 2px 4px rgba(0,0,0,0.5)' }}>🐠</div>
+                <div style={{ position: 'absolute', bottom: '30%', left: '40%', fontSize: '26px', textShadow: '0 2px 4px rgba(0,0,0,0.5)' }}>🐡</div>
               </div>
 
               {/* Badge Overlays */}
@@ -1217,7 +1239,9 @@ Diagnostics:
               <div style={{
                 width: '100%',
                 height: '100%',
-                background: 'linear-gradient(180deg, #0F766E 0%, #115E59 50%, #134E4A 100%)',
+                backgroundImage: activeFeed.mock_image ? `url(${activeFeed.mock_image})` : 'linear-gradient(180deg, #0F766E 0%, #115E59 50%, #134E4A 100%)',
+                backgroundSize: 'cover',
+                backgroundPosition: 'center',
                 position: 'absolute',
                 overflow: 'hidden',
                 transform: `translate(${panOffset.x}px, ${panOffset.y}px) scale(${zoomLevel})`,
@@ -1225,13 +1249,13 @@ Diagnostics:
                 transition: isDragging ? 'none' : 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
               }}>
                 {/* Aquatic Floating Plants */}
-                <div style={{ position: 'absolute', top: '10%', left: '10%', fontSize: '48px', opacity: 0.15 }} className="anim-float-1">🌿</div>
-                <div style={{ position: 'absolute', bottom: '15%', right: '12%', fontSize: '64px', opacity: 0.2 }} className="anim-float-2">🍀</div>
+                <div style={{ position: 'absolute', top: '10%', left: '10%', fontSize: '48px', opacity: 0.2 }} className="anim-float-1">🌿</div>
+                <div style={{ position: 'absolute', bottom: '15%', right: '12%', fontSize: '64px', opacity: 0.25 }} className="anim-float-2">🍀</div>
 
                 {/* Animated Floating Fish Representing Detected Species */}
-                <div style={{ position: 'absolute', top: '35%', left: '30%', fontSize: '32px' }} className="anim-float-1">🐟</div>
-                <div style={{ position: 'absolute', top: '55%', right: '25%', fontSize: '28px' }} className="anim-float-2">🐠</div>
-                <div style={{ position: 'absolute', bottom: '30%', left: '40%', fontSize: '36px' }} className="anim-float-2">🐡</div>
+                <div style={{ position: 'absolute', top: '35%', left: '30%', fontSize: '32px', textShadow: '0 2px 4px rgba(0,0,0,0.5)' }} className="anim-float-1">🐟</div>
+                <div style={{ position: 'absolute', top: '55%', right: '25%', fontSize: '28px', textShadow: '0 2px 4px rgba(0,0,0,0.5)' }} className="anim-float-2">🐠</div>
+                <div style={{ position: 'absolute', bottom: '30%', left: '40%', fontSize: '36px', textShadow: '0 2px 4px rgba(0,0,0,0.5)' }} className="anim-float-2">🐡</div>
 
                 {/* Water Wave Line Overlay representing Calibration */}
                 {activeTank?.calibration && (
