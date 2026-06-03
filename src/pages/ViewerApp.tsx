@@ -221,9 +221,67 @@ const HomeScreen: React.FC = () => {
     nitrite: 0.1
   };
 
+  const feeds = liveState?.feeds || [];
+  const activeFeed = feeds.find(f => f.id === liveState?.selected_feed_id) || feeds[0] || {
+    id: 'feed-main',
+    name: 'Main View',
+    stream_url: 'rtsp://oceaneyes.iot/live-stream-09',
+    is_live: false,
+    started_at: null,
+    current_clarity: 7.8,
+    current_fish_count: 10,
+    mock_image: '/mock_camera_main.png'
+  };
+
+  const displayClarity = liveState?.is_live ? activeFeed.current_clarity : latestReading.clarity;
+  const displayFishCount = liveState?.is_live ? activeFeed.current_fish_count : latestReading.fish_count;
+
+  // Start stream helper
+  const startStream = () => {
+    if (activeTank && liveState) {
+      const updatedFeeds = liveState.feeds.map(f => ({
+        ...f,
+        is_live: true,
+        started_at: f.started_at || new Date().toISOString()
+      }));
+      const active = updatedFeeds.find(f => f.id === liveState.selected_feed_id) || updatedFeeds[0];
+      MockFirestore.saveLiveState(activeTank.id, {
+        ...liveState,
+        is_live: true,
+        stream_url: active.stream_url,
+        started_at: active.started_at || new Date().toISOString(),
+        last_ping_at: new Date().toISOString(),
+        current_clarity: active.current_clarity,
+        current_fish_count: active.current_fish_count,
+        feeds: updatedFeeds
+      });
+    }
+  };
+
+  // Stop stream helper
+  const stopStream = () => {
+    if (activeTank && liveState) {
+      const updatedFeeds = liveState.feeds.map(f => ({
+        ...f,
+        is_live: false,
+        started_at: null
+      }));
+      MockFirestore.saveLiveState(activeTank.id, {
+        ...liveState,
+        is_live: false,
+        stream_url: '',
+        started_at: null,
+        last_ping_at: null,
+        current_clarity: 0,
+        current_fish_count: 0,
+        feeds: updatedFeeds
+      });
+    }
+  };
+
   // Health calculation representing Dart logic: pH, clarity, ammonia, nitrite weighting
   const healthScore = parseFloat((
-    Math.max(1, 10 - (Math.abs(7.2 - latestReading.ph) * 4) - (10 - latestReading.clarity) * 0.4 - (latestReading.ammonia * 20) - (latestReading.nitrite * 3))
+    Math.max(1, 10 - (Math.abs(7.2 - latestReading.ph) * 4) - (10 - displayClarity) * 0.4 - (latestReading.ammonia * 20) - (latestReading.nitrite * 3))
   ).toFixed(1));
 
   // Determine health color rating
@@ -427,7 +485,7 @@ const HomeScreen: React.FC = () => {
                 <Droplet size={18} style={{ color: 'var(--color-info)' }} />
               </div>
               <div>
-                <span style={{ fontSize: '24px', fontWeight: 800 }}>{latestReading.clarity}</span>
+                <span style={{ fontSize: '24px', fontWeight: 800 }}>{displayClarity.toFixed(1)}</span>
                 <span style={{ fontSize: '13px', color: 'var(--color-text-secondary)', marginLeft: '4px' }}>/10 score</span>
               </div>
               {/* Mini Sparkline Chart representing historical clarity */}
@@ -451,13 +509,148 @@ const HomeScreen: React.FC = () => {
                 <span style={{ fontSize: '18px' }}>🐟</span>
               </div>
               <div>
-                <span style={{ fontSize: '24px', fontWeight: 800 }}>{latestReading.fish_count}</span>
+                <span style={{ fontSize: '24px', fontWeight: 800 }}>{displayFishCount}</span>
                 <span style={{ fontSize: '13px', color: 'var(--color-text-secondary)', marginLeft: '4px' }}>fish visible</span>
               </div>
               <span style={{ fontSize: '12px', color: 'var(--color-text-secondary)', display: 'block', marginTop: '8px' }}>
                 Expected Target: {fishList.reduce((sum, f) => sum + f.count, 0)} species count
               </span>
             </div>
+          </div>
+
+          {/* Live Monitor Viewport Card */}
+          <div className="card-decoration" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--color-text-primary)', margin: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Video size={16} style={{ color: 'var(--color-primary)' }} />
+                <span>Live Feed Monitor</span>
+              </h3>
+              
+              {feeds.length > 0 && (
+                <select
+                  value={activeFeed.id}
+                  onChange={(e) => {
+                    if (activeTank) {
+                      MockFirestore.switchActiveFeed(activeTank.id, e.target.value);
+                    }
+                  }}
+                  style={{
+                    padding: '4px 8px',
+                    borderRadius: '8px',
+                    border: '1px solid var(--color-border)',
+                    backgroundColor: 'var(--color-surface)',
+                    color: 'var(--color-text-primary)',
+                    fontFamily: 'var(--font-main)',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    outline: 'none',
+                    cursor: 'pointer'
+                  }}
+                >
+                  {feeds.map(f => (
+                    <option key={f.id} value={f.id}>{f.name}</option>
+                  ))}
+                </select>
+              )}
+            </div>
+
+            {/* Viewport Frame */}
+            <div 
+              className="live-camera-feed"
+              style={{
+                aspectRatio: '16 / 9',
+                position: 'relative',
+                width: '100%',
+                borderRadius: '12px',
+                overflow: 'hidden',
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+                backgroundColor: 'var(--color-background)',
+                border: '1px solid var(--color-border)'
+              }}
+            >
+              {liveState?.is_live ? (
+                <>
+                  {/* Grid Lines */}
+                  <div className="camera-grid" />
+                  <div className="camera-scanline" />
+
+                  {/* Aquatic Render */}
+                  <div style={{
+                    width: '100%',
+                    height: '100%',
+                    backgroundImage: activeFeed.mock_image ? `url(${activeFeed.mock_image})` : 'linear-gradient(180deg, #0F766E 0%, #115E59 50%, #134E4A 100%)',
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center',
+                    position: 'absolute',
+                    overflow: 'hidden'
+                  }}>
+                    <div style={{ position: 'absolute', top: '10%', left: '10%', fontSize: '24px', opacity: 0.2 }}>🌿</div>
+                    <div style={{ position: 'absolute', bottom: '15%', right: '12%', fontSize: '32px', opacity: 0.25 }}>🍀</div>
+                    <div style={{ position: 'absolute', top: '35%', left: '30%', fontSize: '20px', textShadow: '0 1px 3px rgba(0,0,0,0.5)' }} className="anim-float-1">🐟</div>
+                    <div style={{ position: 'absolute', top: '55%', right: '25%', fontSize: '18px', textShadow: '0 1px 3px rgba(0,0,0,0.5)' }} className="anim-float-2">🐠</div>
+                    <div style={{ position: 'absolute', bottom: '30%', left: '40%', fontSize: '22px', textShadow: '0 1px 3px rgba(0,0,0,0.5)' }} className="anim-float-2">🐡</div>
+                  </div>
+
+                  {/* Overlays */}
+                  <div className="live-overlay-pill" style={{ left: '8px', top: '8px', padding: '3px 6px', fontSize: '9px' }}>
+                    <div className="live-badge" />
+                    <span>{activeFeed.name}</span>
+                  </div>
+
+                  <div style={{
+                    position: 'absolute',
+                    bottom: '8px',
+                    left: '8px',
+                    display: 'flex',
+                    gap: '6px',
+                    zIndex: 10
+                  }}>
+                    <div style={{ background: 'rgba(15, 23, 42, 0.85)', padding: '3px 6px', borderRadius: '6px', fontSize: '9px', color: '#FFF' }}>
+                      <strong>{displayFishCount} fish</strong>
+                    </div>
+                    <div style={{ background: 'rgba(15, 23, 42, 0.85)', padding: '3px 6px', borderRadius: '6px', fontSize: '9px', color: '#FFF' }}>
+                      <strong style={{ color: 'var(--color-info)' }}>{displayClarity.toFixed(1)} score</strong>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div style={{ textAlign: 'center', padding: '12px' }}>
+                  <span style={{ fontSize: '24px', display: 'block', marginBottom: '4px' }}>🎥</span>
+                  <p style={{ color: 'var(--color-text-secondary)', fontSize: '12px', margin: '0 0 10px 0' }}>
+                    Feed is idle. Connect stream to monitor.
+                  </p>
+                  <button 
+                    className="primary-button" 
+                    style={{ padding: '6px 12px', fontSize: '12px', margin: '0 auto' }} 
+                    onClick={startStream}
+                  >
+                    Connect Stream
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Quick Actions */}
+            {liveState?.is_live && (
+              <div style={{ display: 'flex', gap: '8px', marginTop: '2px' }}>
+                <button 
+                  className="secondary-button" 
+                  style={{ flex: 1, padding: '8px', fontSize: '12px', borderRadius: '8px', color: 'var(--color-critical)' }}
+                  onClick={stopStream}
+                >
+                  Disconnect Stream
+                </button>
+                <button 
+                  className="primary-button" 
+                  style={{ flex: 1, padding: '8px', fontSize: '12px', borderRadius: '8px' }}
+                  onClick={() => setActiveTab('live')}
+                >
+                  Advanced Controls
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Active Alerts section */}
@@ -570,7 +763,13 @@ const HomeScreen: React.FC = () => {
 // ─── LiveScreen Component ───
 const LiveScreen: React.FC = () => {
   const { liveState, activeTank, triggerManualReading, setActiveTab } = useApp();
-  const [isStreaming, setIsStreaming] = useState(false);
+  const [isStreaming, setIsStreaming] = useState(liveState?.is_live || false);
+
+  useEffect(() => {
+    if (liveState) {
+      setIsStreaming(liveState.is_live);
+    }
+  }, [liveState?.is_live]);
   const [zoomLevel, setZoomLevel] = useState(1.0);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
