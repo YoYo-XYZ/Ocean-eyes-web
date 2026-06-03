@@ -245,7 +245,35 @@ export class MockFirestore {
         }
       ]
     };
-    return getOrSet(key, defaultState);
+    const state = getOrSet(key, defaultState);
+    
+    // Schema Migration for backward compatibility (e.g. if the user has an older saved state in LocalStorage)
+    let needsSave = false;
+    if (!state.feeds || !Array.isArray(state.feeds) || state.feeds.length === 0) {
+      state.feeds = defaultState.feeds;
+      needsSave = true;
+    }
+    if (!state.selected_feed_id) {
+      state.selected_feed_id = defaultState.selected_feed_id;
+      needsSave = true;
+    }
+    
+    // Ensure all feeds have their mock_image defined (backward compatibility for previous multi-cam schema)
+    state.feeds.forEach(f => {
+      if (!f.mock_image) {
+        if (f.id === 'feed-main') f.mock_image = '/mock_camera_main.png';
+        else if (f.id === 'feed-angle') f.mock_image = '/mock_camera_angle.png';
+        else if (f.id === 'feed-mobile') f.mock_image = '/mock_camera_mobile.png';
+        else f.mock_image = '/mock_camera_custom.png';
+        needsSave = true;
+      }
+    });
+
+    if (needsSave) {
+      this.saveLiveState(tankId, state);
+    }
+    
+    return state;
   };
 
   static saveLiveState = (tankId: string, state: LiveState) => {
