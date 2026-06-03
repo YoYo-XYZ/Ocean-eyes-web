@@ -210,7 +210,37 @@ const ViewerShell: React.FC = () => {
 
 // ─── HomeScreen Component ───
 const HomeScreen: React.FC = () => {
-  const { activeTank, readings, fishList, alerts, setActiveTab, setSelectedAlertId, liveState, tanks, linkedTanks, tankId, selectTank } = useApp();
+  const { activeTank, readings, fishList, alerts, setActiveTab, setSelectedAlertId, liveState, tanks, linkedTanks, tankId, selectTank, createAndLinkTank, linkTank } = useApp();
+
+  const [showAddTankModal, setShowAddTankModal] = useState(false);
+  const [newTankName, setNewTankName] = useState('');
+  const [linkTankCode, setLinkTankCode] = useState('');
+  const [addMode, setAddMode] = useState<'create' | 'link'>('create');
+  const [addError, setAddError] = useState('');
+
+  const handleAddTankSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAddError('');
+    if (addMode === 'create') {
+      if (!newTankName.trim()) return;
+      try {
+        await createAndLinkTank(newTankName.trim());
+        setNewTankName('');
+        setShowAddTankModal(false);
+      } catch (err) {
+        setAddError('Failed to create tank.');
+      }
+    } else {
+      if (!linkTankCode.trim()) return;
+      const success = await linkTank(linkTankCode.trim());
+      if (success) {
+        setLinkTankCode('');
+        setShowAddTankModal(false);
+      } else {
+        setAddError('Invalid reference code or tank already linked.');
+      }
+    }
+  };
 
   const latestReading = readings[0] || {
     clarity: 7.8,
@@ -302,7 +332,14 @@ const HomeScreen: React.FC = () => {
           {linkedTanks.length > 1 ? (
             <select
               value={tankId || ''}
-              onChange={(e) => selectTank(e.target.value)}
+              onChange={(e) => {
+                if (e.target.value === 'add-new-tank-action') {
+                  setShowAddTankModal(true);
+                  e.target.value = tankId || '';
+                } else {
+                  selectTank(e.target.value);
+                }
+              }}
               style={{
                 background: 'none',
                 border: 'none',
@@ -323,9 +360,22 @@ const HomeScreen: React.FC = () => {
                   {t.name}
                 </option>
               ))}
+              <option value="add-new-tank-action" style={{ fontSize: '14px', fontWeight: 700, color: 'var(--color-primary)', backgroundColor: 'var(--color-surface)' }}>
+                + Add Tank...
+              </option>
             </select>
           ) : (
-            <h1 className="canvas-title" style={{ marginTop: '2px' }}>{activeTank?.name || 'Living Room Reef'}</h1>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <h1 className="canvas-title" style={{ marginTop: '2px', display: 'inline-block' }}>{activeTank?.name || 'Living Room Reef'}</h1>
+              <button 
+                className="secondary-button" 
+                style={{ padding: '4px 8px', fontSize: '11px', borderRadius: '8px', display: 'inline-flex', alignItems: 'center', gap: '4px', borderColor: 'var(--color-primary)' }}
+                onClick={() => setShowAddTankModal(true)}
+              >
+                <Plus size={10} style={{ color: 'var(--color-primary)' }} />
+                <span style={{ color: 'var(--color-primary-dark)' }}>Add Tank</span>
+              </button>
+            </div>
           )}
         </div>
         
@@ -783,6 +833,151 @@ const HomeScreen: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* Add Tank Modal */}
+      {showAddTankModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100%',
+          backgroundColor: 'rgba(15, 23, 42, 0.6)',
+          backdropFilter: 'blur(4px)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 1000
+        }}>
+          <form 
+            onSubmit={handleAddTankSubmit}
+            className="card-decoration" 
+            style={{ 
+              padding: '24px', 
+              width: '380px', 
+              display: 'flex', 
+              flexDirection: 'column', 
+              gap: '16px',
+              boxShadow: '0 20px 25px -5px rgba(0,0,0,0.15)'
+            }}
+          >
+            <h3 style={{ fontSize: '16px', fontWeight: 700, margin: 0, color: 'var(--color-text-primary)' }}>Add Aquarium Tank</h3>
+            
+            {/* Toggle between Create & Link */}
+            <div style={{ display: 'flex', background: 'var(--color-border)', padding: '2px', borderRadius: '10px', gap: '2px' }}>
+              <button
+                type="button"
+                onClick={() => { setAddMode('create'); setAddError(''); }}
+                style={{
+                  flex: 1,
+                  padding: '6px',
+                  fontSize: '12px',
+                  border: 'none',
+                  borderRadius: '8px',
+                  background: addMode === 'create' ? 'var(--color-surface)' : 'transparent',
+                  color: addMode === 'create' ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
+                  fontWeight: 600,
+                  cursor: 'pointer'
+                }}
+              >
+                Create New Tank
+              </button>
+              <button
+                type="button"
+                onClick={() => { setAddMode('link'); setAddError(''); }}
+                style={{
+                  flex: 1,
+                  padding: '6px',
+                  fontSize: '12px',
+                  border: 'none',
+                  borderRadius: '8px',
+                  background: addMode === 'link' ? 'var(--color-surface)' : 'transparent',
+                  color: addMode === 'link' ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
+                  fontWeight: 600,
+                  cursor: 'pointer'
+                }}
+              >
+                Link Existing Tank
+              </button>
+            </div>
+
+            {addError && (
+              <div style={{ color: 'var(--color-critical)', fontSize: '12px', fontWeight: 500 }}>
+                ⚠️ {addError}
+              </div>
+            )}
+
+            {addMode === 'create' ? (
+              <div>
+                <label style={{ display: 'block', fontSize: '11px', color: 'var(--color-text-secondary)', marginBottom: '4px', fontWeight: 600 }}>AQUARIUM NAME</label>
+                <input 
+                  type="text" 
+                  placeholder="e.g. Bedroom Reef" 
+                  value={newTankName}
+                  onChange={e => setNewTankName(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    borderRadius: '10px',
+                    border: '1px solid var(--color-border)',
+                    outline: 'none',
+                    fontFamily: 'var(--font-main)',
+                    fontSize: '13px',
+                    backgroundColor: 'var(--color-surface)',
+                    color: 'var(--color-text-primary)'
+                  }}
+                  required
+                />
+              </div>
+            ) : (
+              <div>
+                <label style={{ display: 'block', fontSize: '11px', color: 'var(--color-text-secondary)', marginBottom: '4px', fontWeight: 600 }}>TANK REFERENCE ID / CODE</label>
+                <input 
+                  type="text" 
+                  placeholder="e.g. tank-123456" 
+                  value={linkTankCode}
+                  onChange={e => setLinkTankCode(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    borderRadius: '10px',
+                    border: '1px solid var(--color-border)',
+                    outline: 'none',
+                    fontFamily: 'var(--font-main)',
+                    fontSize: '13px',
+                    backgroundColor: 'var(--color-surface)',
+                    color: 'var(--color-text-primary)'
+                  }}
+                  required
+                />
+              </div>
+            )}
+
+            <div style={{ display: 'flex', gap: '10px', marginTop: '8px' }}>
+              <button 
+                type="button"
+                className="secondary-button" 
+                style={{ flex: 1, padding: '10px', fontSize: '13px', borderRadius: '10px' }}
+                onClick={() => {
+                  setShowAddTankModal(false);
+                  setNewTankName('');
+                  setLinkTankCode('');
+                  setAddError('');
+                }}
+              >
+                Cancel
+              </button>
+              <button 
+                type="submit"
+                className="primary-button" 
+                style={{ flex: 1, padding: '10px', fontSize: '13px', borderRadius: '10px' }}
+              >
+                {addMode === 'create' ? 'Create Tank' : 'Link Tank'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
     </div>
   );
 };
@@ -1888,6 +2083,7 @@ const SettingsScreen: React.FC = () => {
   const { activeTank, unlinkTank, updateTankName, setActiveTab } = useApp();
   const [name, setName] = useState(activeTank?.name || 'Living Room Reef');
   const [editing, setEditing] = useState(false);
+  const [showConfirmUnlink, setShowConfirmUnlink] = useState(false);
 
   const handleNameChange = (e: React.FormEvent) => {
     e.preventDefault();
@@ -2034,14 +2230,39 @@ const SettingsScreen: React.FC = () => {
         </div>
       </div>
 
-      {/* Disconnect button */}
-      <button 
-        className="secondary-button" 
-        style={{ width: '100%', color: 'var(--color-critical)', borderColor: 'rgba(239, 68, 68, 0.2)', padding: '14px' }}
-        onClick={unlinkTank}
-      >
-        Disconnect from Tank
-      </button>
+      {/* Disconnect button with confirmation */}
+      {showConfirmUnlink ? (
+        <div className="card-decoration" style={{ padding: '20px', border: '1px solid var(--color-critical)', backgroundColor: 'rgba(239, 68, 68, 0.05)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <strong style={{ fontSize: '14px', color: 'var(--color-critical)' }}>Are you sure you want to disconnect?</strong>
+          <p style={{ fontSize: '12px', color: 'var(--color-text-secondary)', margin: 0, lineHeight: '140%' }}>
+            This will remove "{activeTank?.name}" from your active monitoring dashboard. You can reconnect it later using the reference code: <code>{activeTank?.id}</code>.
+          </p>
+          <div style={{ display: 'flex', gap: '10px', marginTop: '4px' }}>
+            <button 
+              className="secondary-button" 
+              style={{ flex: 1, padding: '8px', fontSize: '12px', borderRadius: '10px' }}
+              onClick={() => setShowConfirmUnlink(false)}
+            >
+              Cancel
+            </button>
+            <button 
+              className="primary-button" 
+              style={{ flex: 1, padding: '8px', fontSize: '12px', borderRadius: '10px', backgroundColor: 'var(--color-critical)', borderColor: 'var(--color-critical)' }}
+              onClick={unlinkTank}
+            >
+              Yes, Disconnect
+            </button>
+          </div>
+        </div>
+      ) : (
+        <button 
+          className="secondary-button" 
+          style={{ width: '100%', color: 'var(--color-critical)', borderColor: 'rgba(239, 68, 68, 0.2)', padding: '14px' }}
+          onClick={() => setShowConfirmUnlink(true)}
+        >
+          Disconnect from Tank
+        </button>
+      )}
     </div>
   );
 };
