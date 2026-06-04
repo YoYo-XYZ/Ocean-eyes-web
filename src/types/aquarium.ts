@@ -13,7 +13,7 @@ export interface FishEntry {
   id: string;
   speciesId: string;
   name: string;
-  emoji: string;
+  imageUrl: string;
   count: number;
   detected: number;
 }

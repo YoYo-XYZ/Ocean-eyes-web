@@ -24,8 +24,9 @@ interface AppContextProps {
   selectTank: (tankId: string) => void;
   unlinkTank: () => void;
   createAndLinkTank: (name: string) => Promise<string>;
-  addFish: (name: string, emoji: string, count: number) => void;
+  addFish: (name: string, imageUrl: string, count: number) => void;
   updateFishCount: (docId: string, count: number) => void;
+  updateFishSpecies: (docId: string, name: string, imageUrl: string) => void;
   removeFish: (docId: string) => void;
   resolveAlert: (alertId: string) => void;
   updateThresholds: (clarityMin: number, fishPct: number) => void;
@@ -123,14 +124,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return newId;
   };
 
-  const addFish = (name: string, emoji: string, count: number) => {
+  const addFish = (name: string, imageUrl: string, count: number) => {
     if (tankId) {
-      MockFirestore.addFish(tankId, name, emoji, count);
+      MockFirestore.addFish(tankId, name, imageUrl, count);
     }
   };
 
   const updateFishCount = (docId: string, count: number) => {
     MockFirestore.updateFishCount(docId, count);
+  };
+
+  const updateFishSpecies = (docId: string, name: string, imageUrl: string) => {
+    MockFirestore.updateFishSpecies(docId, name, imageUrl);
   };
 
   const removeFish = (docId: string) => {
@@ -324,6 +329,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         createAndLinkTank,
         addFish,
         updateFishCount,
+        updateFishSpecies,
         removeFish,
         resolveAlert,
         updateThresholds,

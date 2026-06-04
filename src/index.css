@@ -619,3 +619,79 @@ h1, h2, h3, h4, h5, h6 {
   box-shadow: var(--shadow-card);
 }
 
+/* ─── Species Image Placeholder System ─── */
+.species-image {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  flex-shrink: 0;
+}
+
+.species-image-small {
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  flex-shrink: 0;
+}
+
+.species-angelfish { background-color: #E8D5B7; }
+.species-betta { background-color: #FFB6C1; }
+.species-black-skirt-tetra { background-color: #708090; }
+.species-cardinal-tetra { background-color: #4169E1; }
+.species-cherry-barb { background-color: #DC143C; }
+.species-clown-loach { background-color: #FF8C00; }
+.species-corydoras { background-color: #DAA520; }
+.species-discus { background-color: #9370DB; }
+.species-dwarf-gourami { background-color: #20B2AA; }
+.species-german-blue-ram { background-color: #1E90FF; }
+.species-goldfish { background-color: #FFD700; }
+.species-guppy { background-color: #FF69B4; }
+.species-harlequin-rasbora { background-color: #FF6347; }
+.species-molly { background-color: #B0C4DE; }
+.species-neon-tetra { background-color: #00CED1; }
+.species-oscar { background-color: #8B4513; }
+.species-otocinclus { background-color: #A9A9A9; }
+.species-platy { background-color: #FF4500; }
+.species-plecostomus { background-color: #556B2F; }
+.species-rummy-nose-tetra { background-color: #FF0000; }
+.species-siamese-algae-eater { background-color: #C0C0C0; }
+.species-swordtail { background-color: #FF8C00; }
+.species-tiger-barb { background-color: #FF6347; }
+.species-zebra-danio { background-color: #4169E1; }
+.species-dwarf-rasbora { background-color: #FF69B4; }
+.species-unknown { background-color: #94A3B8; }
+
+/* Hover state for species selector items */
+.species-selector-item:hover {
+  background-color: var(--color-hover, #F1F5F9);
+}
+
+/* Species selector dropdown */
+.species-selector-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  max-height: 280px;
+  overflow-y: auto;
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  z-index: 100;
+}
+
