@@ -7,7 +7,8 @@ import {
   Home, 
   Video, 
   Settings, 
-  RefreshCw
+  RefreshCw,
+  Fish
 } from 'lucide-react';
 
 const OceanEyesDashboard: React.FC = () => {
@@ -71,6 +72,14 @@ const OceanEyesDashboard: React.FC = () => {
           >
             <Video size={18} />
             <span>Live Video Feed</span>
+          </button>
+
+          <button 
+            className={`sidebar-link ${activeTab === 'my_fish' ? 'active' : ''}`}
+            onClick={() => setActiveTab('my_fish')}
+          >
+            <Fish size={18} />
+            <span>My Fish</span>
           </button>
 
           <button 
