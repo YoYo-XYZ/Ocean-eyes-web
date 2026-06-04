@@ -842,7 +842,7 @@ Diagnostics:
                 {(feed.calibration || activeTank?.calibration) && (
                   <div style={{
                     position: 'absolute',
-                    top: `${Math.min(95, Math.max(5, ((feed.calibration?.water_line_y || activeTank?.calibration?.water_line_y || 120) / 240) * 100))}%`,
+                    top: `${Math.min(100, Math.max(0, ((feed.calibration?.water_line_y || activeTank?.calibration?.water_line_y || 120) / 240) * 100))}%`,
                     left: 0,
                     width: '100%',
                     height: '1px',
@@ -958,7 +958,7 @@ Diagnostics:
                 {activeFeedCalibration && (
                   <div style={{
                     position: 'absolute',
-                    top: `${Math.min(95, Math.max(5, (activeFeedCalibration.water_line_y / 240) * 100))}%`,
+                    top: `${Math.min(100, Math.max(0, (activeFeedCalibration.water_line_y / 240) * 100))}%`,
                     left: 0,
                     width: '100%',
                     height: '2px',
@@ -1562,9 +1562,9 @@ Diagnostics:
                   alignItems: 'center', 
                   justifyContent: 'center', 
                   gap: '6px',
-                  backgroundColor: isCalibrating ? 'var(--color-critical)' : 'none',
-                  color: isCalibrating ? '#FFF' : 'var(--color-primary-dark)',
-                  borderColor: isCalibrating ? 'var(--color-critical)' : 'var(--color-primary)'
+                  backgroundColor: isCalibrating ? 'var(--color-critical)' : undefined,
+                  color: isCalibrating ? '#FFF' : undefined,
+                  borderColor: isCalibrating ? 'var(--color-critical)' : undefined
                 }}
                 onClick={() => setIsCalibrating(!isCalibrating)}
               >

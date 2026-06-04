@@ -87,7 +87,7 @@ export const ActiveMonitoringScreen: React.FC<ScreenProps> = ({ onNavigate }) =>
     }
   };
 
-  const waterHeightPct = activeTank?.calibration ? Math.min(95, Math.max(5, ((240 - activeTank.calibration.water_line_y) / 240) * 100)) : 50;
+  const waterHeightPct = activeTank?.calibration ? Math.min(100, Math.max(0, ((240 - activeTank.calibration.water_line_y) / 240) * 100)) : 50;
 
   return (
     <div style={{
@@ -234,7 +234,7 @@ export const ActiveMonitoringScreen: React.FC<ScreenProps> = ({ onNavigate }) =>
         {activeTank?.calibration && (
           <div style={{
             position: 'absolute',
-            top: `${Math.min(95, Math.max(5, (activeTank.calibration.water_line_y / 240) * 100))}%`,
+            top: `${Math.min(100, Math.max(0, (activeTank.calibration.water_line_y / 240) * 100))}%`,
             left: 0,
             width: '100%',
             height: '2px',
