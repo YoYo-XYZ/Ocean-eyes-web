@@ -40,9 +40,9 @@ const SEED_TANKS: TankBrief[] = [
 ];
 
 const SEED_FISH: FishEntry[] = [
-  { id: 'f1', speciesId: 'neon-tetra', name: 'Neon Tetra', emoji: '🐟', count: 6, detected: 5 },
-  { id: 'f2', speciesId: 'guppy', name: 'Guppy', emoji: '🐠', count: 3, detected: 3 },
-  { id: 'f3', speciesId: 'corydoras', name: 'Corydoras', emoji: '🐡', count: 2, detected: 2 }
+  { id: 'f1', speciesId: 'neon_tetra', name: 'Neon Tetra', imageUrl: 'species-neon-tetra', count: 6, detected: 5 },
+  { id: 'f2', speciesId: 'guppy', name: 'Guppy', imageUrl: 'species-guppy', count: 3, detected: 3 },
+  { id: 'f3', speciesId: 'corydoras', name: 'Corydoras', imageUrl: 'species-corydoras', count: 2, detected: 2 }
 ];
 
 const SEED_READINGS: ReadingItem[] = [
@@ -441,14 +441,14 @@ export class MockFirestore {
 
   // ─── Fish Operations ─────────────────────────────────────────────────────────
 
-  static addFish(_tankId: string, name: string, emoji: string, count: number) {
+  static addFish(_tankId: string, name: string, imageUrl: string, count: number) {
     const fish = this.getFish();
     const speciesId = name.toLowerCase().replace(/\s+/g, '-');
     const newEntry: FishEntry = {
       id: `fish-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
       speciesId,
       name,
-      emoji,
+      imageUrl,
       count,
       detected: count // Start as fully detected
     };
@@ -461,6 +461,17 @@ export class MockFirestore {
     const index = fish.findIndex(f => f.id === docId);
     if (index !== -1) {
       fish[index].count = count;
+      this.saveFish(fish);
+    }
+  }
+
+  static updateFishSpecies(docId: string, name: string, imageUrl: string) {
+    const fish = this.getFish();
+    const index = fish.findIndex(f => f.id === docId);
+    if (index !== -1) {
+      fish[index].name = name;
+      fish[index].imageUrl = imageUrl;
+      fish[index].speciesId = name.toLowerCase().replace(/\s+/g, '-');
       this.saveFish(fish);
     }
   }

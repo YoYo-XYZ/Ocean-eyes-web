@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { MockFirestore } from '../../services/mock_service';
+import { getSpeciesColor, getSpeciesInitials } from '../../data/speciesCatalog';
 import { 
   AlertTriangle, 
   Droplet, 
@@ -340,7 +341,22 @@ export const HomeScreen: React.FC = () => {
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <span style={{ fontSize: '24px' }}>{fish.emoji}</span>
+                    <div style={{
+                      width: '32px',
+                      height: '32px',
+                      borderRadius: '6px',
+                      backgroundColor: getSpeciesColor(fish.speciesId),
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '11px',
+                      fontWeight: 700,
+                      color: '#fff',
+                      flexShrink: 0,
+                      textShadow: '0 1px 2px rgba(0,0,0,0.3)'
+                    }}>
+                      {getSpeciesInitials(fish.speciesId)}
+                    </div>
                     <div>
                       <span style={{ fontSize: '15px', fontWeight: 600, color: 'var(--color-text-primary)' }}>{fish.name}</span>
                       <span style={{ fontSize: '11px', display: 'block', color: 'var(--color-text-secondary)', fontWeight: 500, marginTop: '2px' }}>
