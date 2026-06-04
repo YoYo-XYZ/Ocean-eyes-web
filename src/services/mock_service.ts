@@ -382,7 +382,15 @@ export class MockFirestore {
     }
   }
 
-  static updateCalibration(tankId: string, waterLineY: number) {
+  static updateCalibration(tankId: string, feedId: string, waterLineY: number) {
+    if (feedId) {
+      const liveState = this.getLiveState(tankId);
+      const feedIndex = liveState.feeds.findIndex(f => f.id === feedId);
+      if (feedIndex !== -1) {
+        liveState.feeds[feedIndex].calibration = { water_line_y: waterLineY };
+        this.saveLiveState(tankId, liveState);
+      }
+    }
     const tanks = this.getTanks();
     const index = tanks.findIndex(t => t.id === tankId);
     if (index !== -1) {

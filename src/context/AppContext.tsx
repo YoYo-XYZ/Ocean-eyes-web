@@ -149,7 +149,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const updateCalibration = (waterLineY: number) => {
     if (tankId) {
-      MockFirestore.updateCalibration(tankId, waterLineY);
+      const activeFeedId = liveState?.selected_feed_id || '';
+      MockFirestore.updateCalibration(tankId, activeFeedId, waterLineY);
+      setLiveState(MockFirestore.getLiveState(tankId));
     }
   };
 

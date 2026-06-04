@@ -60,14 +60,9 @@ export const LiveScreen: React.FC = () => {
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const [flashActive, setFlashActive] = useState(false);
 
-  // Water level calibration helpers
-  const currentWaterLineY = activeTank?.calibration?.water_line_y ?? 120;
-  const currentPercentage = Math.round((1 - currentWaterLineY / 240) * 100);
-
-  const handleCalibrationChange = (pct: number) => {
-    const newY = Math.round((1 - pct / 100) * 240);
-    updateCalibration(newY);
-  };
+  // Water level calibration state
+  const [isCalibrating, setIsCalibrating] = useState(false);
+  const [isCalibDragging, setIsCalibDragging] = useState(false);
 
   // Camera filter states
   const [filters, setFilters] = useState<CameraFilters>({
@@ -268,6 +263,16 @@ export const LiveScreen: React.FC = () => {
     current_fish_count: 10
   };
 
+  // Water level calibration helpers (resolving per-camera calibration first)
+  const activeFeedCalibration = activeFeed?.calibration || activeTank?.calibration;
+  const currentWaterLineY = activeFeedCalibration?.water_line_y ?? 120;
+  const currentPercentage = Math.round((1 - currentWaterLineY / 240) * 100);
+
+  const handleCalibrationChange = (pct: number) => {
+    const newY = Math.round((1 - pct / 100) * 240);
+    updateCalibration(newY);
+  };
+
   const stateClarity = isStreaming && liveState?.is_live ? activeFeed.current_clarity : 0;
   const stateFish = isStreaming && liveState?.is_live ? activeFeed.current_fish_count : 0;
 
@@ -303,6 +308,14 @@ export const LiveScreen: React.FC = () => {
 
   // Drag handlers
   const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (isCalibrating) {
+      setIsCalibDragging(true);
+      const rect = e.currentTarget.getBoundingClientRect();
+      const yPixel = Math.min(360, Math.max(0, e.clientY - rect.top));
+      const newY = Math.round((yPixel / 360) * 240);
+      updateCalibration(newY);
+      return;
+    }
     if (zoomLevel <= 1.0) return;
     setIsDragging(true);
     setDragStart({
@@ -312,6 +325,15 @@ export const LiveScreen: React.FC = () => {
   };
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (isCalibrating) {
+      if (isCalibDragging || e.buttons === 1) {
+        const rect = e.currentTarget.getBoundingClientRect();
+        const yPixel = Math.min(360, Math.max(0, e.clientY - rect.top));
+        const newY = Math.round((yPixel / 360) * 240);
+        updateCalibration(newY);
+      }
+      return;
+    }
     if (!isDragging || zoomLevel <= 1.0) return;
     
     let newX = e.clientX - dragStart.x;
@@ -328,6 +350,15 @@ export const LiveScreen: React.FC = () => {
   };
 
   const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (isCalibrating) {
+      setIsCalibDragging(true);
+      const rect = e.currentTarget.getBoundingClientRect();
+      const clientY = e.touches[0].clientY;
+      const yPixel = Math.min(360, Math.max(0, clientY - rect.top));
+      const newY = Math.round((yPixel / 360) * 240);
+      updateCalibration(newY);
+      return;
+    }
     if (zoomLevel <= 1.0 || e.touches.length !== 1) return;
     const touch = e.touches[0];
     setIsDragging(true);
@@ -338,6 +369,16 @@ export const LiveScreen: React.FC = () => {
   };
 
   const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (isCalibrating) {
+      if (isCalibDragging) {
+        const rect = e.currentTarget.getBoundingClientRect();
+        const clientY = e.touches[0].clientY;
+        const yPixel = Math.min(360, Math.max(0, clientY - rect.top));
+        const newY = Math.round((yPixel / 360) * 240);
+        updateCalibration(newY);
+      }
+      return;
+    }
     if (!isDragging || zoomLevel <= 1.0 || e.touches.length !== 1) return;
     const touch = e.touches[0];
     
@@ -356,6 +397,7 @@ export const LiveScreen: React.FC = () => {
 
   const handleMouseUpOrLeave = () => {
     setIsDragging(false);
+    setIsCalibDragging(false);
   };
 
   const takeSnapshot = () => {
@@ -795,6 +837,19 @@ Diagnostics:
                 )}
                 <div style={{ position: 'absolute', top: '10%', left: '10%', fontSize: '32px', opacity: 0.2 }}>🌿</div>
                 <div style={{ position: 'absolute', bottom: '15%', right: '12%', fontSize: '42px', opacity: 0.25 }}>🍀</div>
+
+                {/* Water Calibration Line in Grid View */}
+                {(feed.calibration || activeTank?.calibration) && (
+                  <div style={{
+                    position: 'absolute',
+                    top: `${Math.min(95, Math.max(5, ((feed.calibration?.water_line_y || activeTank?.calibration?.water_line_y || 120) / 240) * 100))}%`,
+                    left: 0,
+                    width: '100%',
+                    height: '1px',
+                    borderTop: '1px dashed rgba(255,255,255,0.35)',
+                    zIndex: 10
+                  }} />
+                )}
               </div>
 
               {/* Badge Overlays */}
@@ -830,9 +885,9 @@ Diagnostics:
             display: 'flex', 
             justifyContent: 'center', 
             alignItems: 'center',
-            cursor: zoomLevel > 1.0 ? (isDragging ? 'grabbing' : 'grab') : 'default',
+            cursor: isCalibrating ? 'ns-resize' : (zoomLevel > 1.0 ? (isDragging ? 'grabbing' : 'grab') : 'default'),
             userSelect: 'none',
-            touchAction: zoomLevel > 1.0 ? 'none' : 'auto'
+            touchAction: isCalibrating || zoomLevel > 1.0 ? 'none' : 'auto'
           }}
           onMouseDown={handleMouseDown}
           onMouseMove={handleMouseMove}
@@ -900,28 +955,30 @@ Diagnostics:
                 <div style={{ position: 'absolute', bottom: '15%', right: '12%', fontSize: '64px', opacity: 0.25 }} className="anim-float-2">🍀</div>
 
                 {/* Water Wave Line Overlay representing Calibration */}
-                {activeTank?.calibration && (
+                {activeFeedCalibration && (
                   <div style={{
                     position: 'absolute',
-                    top: `${Math.min(95, Math.max(5, (activeTank.calibration.water_line_y / 240) * 100))}%`,
+                    top: `${Math.min(95, Math.max(5, (activeFeedCalibration.water_line_y / 240) * 100))}%`,
                     left: 0,
                     width: '100%',
                     height: '2px',
-                    borderTop: '2px dashed rgba(255,255,255,0.4)',
-                    zIndex: 10
+                    borderTop: isCalibrating ? '2px dashed var(--color-critical)' : '2px dashed rgba(255,255,255,0.4)',
+                    zIndex: 10,
+                    transition: isCalibDragging ? 'none' : 'top 0.1s ease-out'
                   }}>
                     <span style={{
                       position: 'absolute',
                       right: '10px',
                       top: '-18px',
                       fontSize: '9px',
-                      color: 'rgba(255,255,255,0.6)',
-                      background: 'rgba(0,0,0,0.4)',
+                      color: '#FFF',
+                      background: isCalibrating ? 'var(--color-critical)' : 'rgba(0,0,0,0.4)',
                       padding: '2px 6px',
                       borderRadius: '4px',
-                      fontWeight: 600
+                      fontWeight: 600,
+                      boxShadow: isCalibrating ? '0 0 8px rgba(239, 68, 68, 0.5)' : 'none'
                     }}>
-                      CALIBRATED LINE
+                      {isCalibrating ? 'DRAG TO CALIBRATE' : 'CALIBRATED LINE'}
                     </span>
                   </div>
                 )}
@@ -1487,35 +1544,45 @@ Diagnostics:
             </div>
             
             <p style={{ fontSize: '12px', color: 'var(--color-text-secondary)', lineHeight: '140%', margin: 0 }}>
-              Adjust the slider to align the camera's reference water line overlay with the physical water level inside your aquarium.
+              {isCalibrating 
+                ? "Calibration Mode Active: Click and drag the dashed line directly in the camera viewport above to adjust the reference water line level."
+                : "Enable drag calibration to align the camera's reference water line overlay with the physical water level inside this camera's feed."
+              }
             </p>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '4px' }}>
-              <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>Low (5%)</span>
-              <input 
-                type="range" 
-                min="5" 
-                max="95" 
-                step="1"
-                value={currentPercentage}
-                onChange={(e) => handleCalibrationChange(parseInt(e.target.value))}
-                style={{ flex: 1, accentColor: 'var(--color-primary)', cursor: 'pointer' }}
-              />
-              <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)', marginRight: '8px' }}>High (95%)</span>
+            <div style={{ display: 'flex', gap: '10px', marginTop: '4px' }}>
               <button 
-                onClick={() => handleCalibrationChange(50)}
+                className={isCalibrating ? "primary-button" : "secondary-button"} 
                 style={{ 
-                  background: 'none', 
-                  border: '1px solid var(--color-border)', 
-                  padding: '4px 10px', 
-                  borderRadius: '6px', 
-                  color: 'var(--color-text-primary)', 
-                  cursor: 'pointer', 
-                  fontSize: '11px', 
-                  fontWeight: 500 
+                  padding: '8px 16px', 
+                  fontSize: '12px', 
+                  borderRadius: '8px', 
+                  flex: 1, 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center', 
+                  gap: '6px',
+                  backgroundColor: isCalibrating ? 'var(--color-critical)' : 'none',
+                  color: isCalibrating ? '#FFF' : 'var(--color-primary-dark)',
+                  borderColor: isCalibrating ? 'var(--color-critical)' : 'var(--color-primary)'
                 }}
+                onClick={() => setIsCalibrating(!isCalibrating)}
               >
-                Reset
+                {isCalibrating ? 'Done Calibrating' : 'Enable Drag Calibration'}
+              </button>
+              <button 
+                className="secondary-button" 
+                style={{ 
+                  padding: '8px 16px', 
+                  fontSize: '12px', 
+                  borderRadius: '8px', 
+                  borderColor: 'var(--color-border)', 
+                  color: 'var(--color-text-secondary)', 
+                  cursor: 'pointer' 
+                }}
+                onClick={() => handleCalibrationChange(50)}
+              >
+                Reset to 50%
               </button>
             </div>
           </div>

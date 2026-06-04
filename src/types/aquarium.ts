@@ -56,6 +56,9 @@ export interface CameraFeed {
   current_clarity: number;
   current_fish_count: number;
   mock_image?: string;
+  calibration?: {
+    water_line_y: number;
+  };
 }
 
 export interface LiveState {
