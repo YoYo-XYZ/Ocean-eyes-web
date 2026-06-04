@@ -11,13 +11,11 @@ import {
   ZoomOut, 
   Camera, 
   Square, 
-  Clock, 
-  RefreshCw, 
-  Cpu, 
   Download, 
   Trash2,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Ruler
 } from 'lucide-react';
 
 const DEFAULT_PRESETS: FilterPreset[] = [
@@ -48,7 +46,7 @@ const DEFAULT_PRESETS: FilterPreset[] = [
 ];
 
 export const LiveScreen: React.FC = () => {
-  const { liveState, activeTank, triggerManualReading, setActiveTab } = useApp();
+  const { liveState, activeTank, updateCalibration } = useApp();
   const [isStreaming, setIsStreaming] = useState(liveState?.is_live || false);
 
   useEffect(() => {
@@ -61,6 +59,15 @@ export const LiveScreen: React.FC = () => {
   const [isRecording, setIsRecording] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const [flashActive, setFlashActive] = useState(false);
+
+  // Water level calibration helpers
+  const currentWaterLineY = activeTank?.calibration?.water_line_y ?? 120;
+  const currentPercentage = Math.round((1 - currentWaterLineY / 240) * 100);
+
+  const handleCalibrationChange = (pct: number) => {
+    const newY = Math.round((1 - pct / 100) * 240);
+    updateCalibration(newY);
+  };
 
   // Camera filter states
   const [filters, setFilters] = useState<CameraFilters>({
@@ -1461,28 +1468,54 @@ Diagnostics:
             Close Camera Connection
           </button>
 
-          <div className="card-decoration" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            <h4 style={{ fontSize: '14px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <Clock size={16} />
-              <span>Simulated Stream Diagnostics</span>
-            </h4>
-            <p style={{ fontSize: '12px', color: 'var(--color-text-secondary)', lineHeight: '140%' }}>
-              This simulates an active stream connection. In the background, the IoT Monitor reads the water levels and syncs data to Firestore in real time.
+          <div className="card-decoration" style={{ padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h4 style={{ fontSize: '14px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px', margin: 0, color: 'var(--color-text-primary)' }}>
+                <Ruler size={16} style={{ color: 'var(--color-primary)' }} />
+                <span>Water Calibration Level</span>
+              </h4>
+              <span style={{ 
+                fontSize: '11px', 
+                fontWeight: 600, 
+                background: 'var(--color-primary-light)', 
+                color: 'var(--color-primary-dark)', 
+                padding: '2px 8px', 
+                borderRadius: '12px'
+              }}>
+                {currentPercentage}% Calibrated
+              </span>
+            </div>
+            
+            <p style={{ fontSize: '12px', color: 'var(--color-text-secondary)', lineHeight: '140%', margin: 0 }}>
+              Adjust the slider to align the camera's reference water line overlay with the physical water level inside your aquarium.
             </p>
-            <div style={{ display: 'flex', gap: '10px', marginTop: '4px' }}>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '4px' }}>
+              <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>Low (5%)</span>
+              <input 
+                type="range" 
+                min="5" 
+                max="95" 
+                step="1"
+                value={currentPercentage}
+                onChange={(e) => handleCalibrationChange(parseInt(e.target.value))}
+                style={{ flex: 1, accentColor: 'var(--color-primary)', cursor: 'pointer' }}
+              />
+              <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)', marginRight: '8px' }}>High (95%)</span>
               <button 
-                className="primary-button" 
-                style={{ padding: '8px 12px', fontSize: '12px', borderRadius: '16px', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
-                onClick={triggerManualReading}
+                onClick={() => handleCalibrationChange(50)}
+                style={{ 
+                  background: 'none', 
+                  border: '1px solid var(--color-border)', 
+                  padding: '4px 10px', 
+                  borderRadius: '6px', 
+                  color: 'var(--color-text-primary)', 
+                  cursor: 'pointer', 
+                  fontSize: '11px', 
+                  fontWeight: 500 
+                }}
               >
-                <RefreshCw size={12} /> Force Metric Scan
-              </button>
-              <button 
-                className="secondary-button" 
-                style={{ padding: '8px 12px', fontSize: '12px', borderRadius: '16px', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
-                onClick={() => setActiveTab('monitor')}
-              >
-                <Cpu size={12} /> IoT Scanner Console
+                Reset
               </button>
             </div>
           </div>
