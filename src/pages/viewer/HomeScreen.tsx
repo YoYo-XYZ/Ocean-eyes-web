@@ -468,7 +468,6 @@ export const HomeScreen: React.FC = () => {
                 <>
                   {/* Grid Lines */}
                   <div className="camera-grid" />
-                  <div className="camera-scanline" />
 
                   {/* Aquatic Render */}
                   <div style={{

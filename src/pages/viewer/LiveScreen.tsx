@@ -743,7 +743,6 @@ Diagnostics:
 
               {/* Live Camera Grid Lines */}
               <div className="camera-grid" />
-              <div className="camera-scanline" />
 
               {/* Aquatic Render */}
               <div style={{
@@ -843,7 +842,6 @@ Diagnostics:
 
               {/* Live Camera Grid Lines */}
               <div className="camera-grid" />
-              <div className="camera-scanline" />
 
               {/* Simulated Live Stream Feed - Aquatic Render */}
               <div style={{
