@@ -429,10 +429,6 @@ export const LiveScreen: React.FC = () => {
       ctx.fillText('🌿', 80, 60);
       ctx.fillText('🍀', 560, 280);
 
-      ctx.fillText('🐟', 200, 140);
-      ctx.fillText('🐠', 460, 200);
-      ctx.fillText('🐡', 280, 260);
-
       // Calibrated water line
       if (activeTank?.calibration) {
         const yPercent = activeTank.calibration.water_line_y / 240;
@@ -793,9 +789,6 @@ Diagnostics:
                 )}
                 <div style={{ position: 'absolute', top: '10%', left: '10%', fontSize: '32px', opacity: 0.2 }}>🌿</div>
                 <div style={{ position: 'absolute', bottom: '15%', right: '12%', fontSize: '42px', opacity: 0.25 }}>🍀</div>
-                <div style={{ position: 'absolute', top: '35%', left: '30%', fontSize: '24px', textShadow: '0 2px 4px rgba(0,0,0,0.5)' }}>🐟</div>
-                <div style={{ position: 'absolute', top: '55%', right: '25%', fontSize: '20px', textShadow: '0 2px 4px rgba(0,0,0,0.5)' }}>🐠</div>
-                <div style={{ position: 'absolute', bottom: '30%', left: '40%', fontSize: '26px', textShadow: '0 2px 4px rgba(0,0,0,0.5)' }}>🐡</div>
               </div>
 
               {/* Badge Overlays */}
@@ -900,11 +893,6 @@ Diagnostics:
                 {/* Aquatic Floating Plants */}
                 <div style={{ position: 'absolute', top: '10%', left: '10%', fontSize: '48px', opacity: 0.2 }} className="anim-float-1">🌿</div>
                 <div style={{ position: 'absolute', bottom: '15%', right: '12%', fontSize: '64px', opacity: 0.25 }} className="anim-float-2">🍀</div>
-
-                {/* Animated Floating Fish Representing Detected Species */}
-                <div style={{ position: 'absolute', top: '35%', left: '30%', fontSize: '32px', textShadow: '0 2px 4px rgba(0,0,0,0.5)' }} className="anim-float-1">🐟</div>
-                <div style={{ position: 'absolute', top: '55%', right: '25%', fontSize: '28px', textShadow: '0 2px 4px rgba(0,0,0,0.5)' }} className="anim-float-2">🐠</div>
-                <div style={{ position: 'absolute', bottom: '30%', left: '40%', fontSize: '36px', textShadow: '0 2px 4px rgba(0,0,0,0.5)' }} className="anim-float-2">🐡</div>
 
                 {/* Water Wave Line Overlay representing Calibration */}
                 {activeTank?.calibration && (

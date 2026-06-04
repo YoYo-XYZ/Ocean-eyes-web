@@ -482,9 +482,6 @@ export const HomeScreen: React.FC = () => {
                   }}>
                     <div style={{ position: 'absolute', top: '10%', left: '10%', fontSize: '24px', opacity: 0.2 }}>🌿</div>
                     <div style={{ position: 'absolute', bottom: '15%', right: '12%', fontSize: '32px', opacity: 0.25 }}>🍀</div>
-                    <div style={{ position: 'absolute', top: '35%', left: '30%', fontSize: '20px', textShadow: '0 1px 3px rgba(0,0,0,0.5)' }} className="anim-float-1">🐟</div>
-                    <div style={{ position: 'absolute', top: '55%', right: '25%', fontSize: '18px', textShadow: '0 1px 3px rgba(0,0,0,0.5)' }} className="anim-float-2">🐠</div>
-                    <div style={{ position: 'absolute', bottom: '30%', left: '40%', fontSize: '22px', textShadow: '0 1px 3px rgba(0,0,0,0.5)' }} className="anim-float-2">🐡</div>
                   </div>
 
                   {/* Overlays */}
