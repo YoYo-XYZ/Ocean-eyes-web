@@ -1,8 +1,90 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
-import { Plus, Trash2, Pencil, X } from 'lucide-react';
+import { Plus, Trash2, Pencil, X, Fish, Eye, Hash, BarChart3 } from 'lucide-react';
 import { SpeciesSelector } from '../../components/SpeciesSelector';
 import { getSpeciesById, getSpeciesColor, getSpeciesInitials, type SpeciesInfo } from '../../data/speciesCatalog';
+
+interface DonutChartProps {
+  speciesDistribution: { name: string; count: number; color: string; initials: string }[];
+}
+
+const DonutChart: React.FC<DonutChartProps> = ({ speciesDistribution }) => {
+  if (speciesDistribution.length === 0) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '200px', color: 'var(--color-text-secondary)' }}>
+        No fish data available
+      </div>
+    );
+  }
+
+  const total = speciesDistribution.reduce((sum, s) => sum + s.count, 0);
+  const radius = 80;
+  const circumference = 2 * Math.PI * radius;
+  
+  // Pre-calculate offsets without mutation
+  const segmentsWithOffsets = speciesDistribution.reduce<
+    Array<{ species: typeof speciesDistribution[0]; dashLength: number; gapLength: number; index: number; offset: number }>
+  >((acc, species, index) => {
+    const percentage = species.count / total;
+    const dashLength = circumference * percentage;
+    const gapLength = circumference - dashLength;
+    const offset = acc.length > 0 ? acc[acc.length - 1].offset + acc[acc.length - 1].dashLength : 0;
+    acc.push({ species, dashLength, gapLength, index, offset });
+    return acc;
+  }, []);
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }}>
+      <div style={{ position: 'relative', width: '200px', height: '200px' }}>
+        <svg width="200" height="200" viewBox="0 0 200 200">
+          <g transform="rotate(-90 100 100)">
+            {segmentsWithOffsets.map(({ species, dashLength, gapLength, offset, index }) => (
+              <circle
+                key={index}
+                cx="100"
+                cy="100"
+                r={radius}
+                fill="none"
+                stroke={species.color}
+                strokeWidth="24"
+                strokeDasharray={`${dashLength} ${gapLength}`}
+                strokeDashoffset={-offset}
+                style={{ transition: 'all 0.3s ease' }}
+              />
+            ))}
+          </g>
+        </svg>
+        <div style={{
+          position: 'absolute',
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          textAlign: 'center'
+        }}>
+          <div style={{ fontSize: '28px', fontWeight: 800, color: 'var(--color-text-primary)' }}>{total}</div>
+          <div style={{ fontSize: '11px', color: 'var(--color-text-secondary)', fontWeight: 600 }}>TOTAL FISH</div>
+        </div>
+      </div>
+
+      {/* Legend */}
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', justifyContent: 'center', width: '100%' }}>
+        {speciesDistribution.map((species, index) => (
+          <div key={index} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: 600 }}>
+            <div style={{
+              width: '10px',
+              height: '10px',
+              borderRadius: '3px',
+              backgroundColor: species.color
+            }} />
+            <span style={{ color: 'var(--color-text-secondary)' }}>
+              {species.name} ({species.count})
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
 
 export const MyFishScreen: React.FC = () => {
   const { fishList, addFish, removeFish, updateFishCount, updateFishSpecies, setActiveTab } = useApp();
@@ -59,6 +141,47 @@ export const MyFishScreen: React.FC = () => {
       name: fish.name
     };
   };
+
+  // Compute stats and species distribution
+  const stats = useMemo(() => {
+    const totalFish = fishList.reduce((sum, f) => sum + f.count, 0);
+    const totalDetected = fishList.reduce((sum, f) => sum + f.detected, 0);
+    const uniqueSpecies = new Set(fishList.map(f => f.speciesId)).size;
+    const detectionRate = totalFish > 0 ? Math.round((totalDetected / totalFish) * 100) : 0;
+    return { totalFish, totalDetected, uniqueSpecies, detectionRate };
+  }, [fishList]);
+
+  const speciesDistribution = useMemo(() => {
+    const distribution: Record<string, { name: string; count: number; color: string; initials: string }> = {};
+    fishList.forEach(fish => {
+      const species = getSpeciesById(fish.speciesId);
+      let name: string;
+      let color: string;
+      let initials: string;
+      
+      if (species) {
+        name = species.displayName;
+        color = species.color;
+        initials = species.initials;
+      } else {
+        name = fish.name;
+        color = getSpeciesColor(fish.speciesId);
+        initials = getSpeciesInitials(fish.speciesId);
+      }
+      
+      if (distribution[fish.speciesId]) {
+        distribution[fish.speciesId].count += fish.count;
+      } else {
+        distribution[fish.speciesId] = {
+          name,
+          count: fish.count,
+          color,
+          initials
+        };
+      }
+    });
+    return Object.values(distribution).sort((a, b) => b.count - a.count);
+  }, [fishList]);
 
   return (
     <div style={{ padding: '0 20px 30px 20px' }}>
@@ -118,8 +241,91 @@ export const MyFishScreen: React.FC = () => {
         </form>
       )}
 
-      {/* Main Fish List details with controls */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+      {/* Two-column layout: Left sidebar + Fish list */}
+      <div className="fish-inventory-grid">
+        {/* Left Sidebar - Chart & Stats */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          {/* Species Distribution Chart */}
+          <div className="card-decoration" style={{ padding: '20px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+              <BarChart3 size={18} color="var(--color-primary)" />
+              <h3 style={{ fontSize: '15px', fontWeight: 700 }}>Species Distribution</h3>
+            </div>
+            <DonutChart speciesDistribution={speciesDistribution} />
+          </div>
+
+          {/* Aquarium Overview Stats */}
+          <div className="card-decoration" style={{ padding: '20px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+              <Fish size={18} color="var(--color-primary)" />
+              <h3 style={{ fontSize: '15px', fontWeight: 700 }}>Aquarium Overview</h3>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              <div style={{ 
+                background: 'var(--color-primary-light)', 
+                borderRadius: '12px', 
+                padding: '14px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '4px'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Hash size={14} color="var(--color-primary-dark)" />
+                  <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--color-primary-dark)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Total Fish</span>
+                </div>
+                <span style={{ fontSize: '24px', fontWeight: 800, color: 'var(--color-text-primary)' }}>{stats.totalFish}</span>
+              </div>
+
+              <div style={{ 
+                background: 'rgba(59, 130, 246, 0.08)', 
+                borderRadius: '12px', 
+                padding: '14px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '4px'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Fish size={14} color="var(--color-info)" />
+                  <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--color-info)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Species</span>
+                </div>
+                <span style={{ fontSize: '24px', fontWeight: 800, color: 'var(--color-text-primary)' }}>{stats.uniqueSpecies}</span>
+              </div>
+
+              <div style={{ 
+                background: 'rgba(16, 185, 129, 0.08)', 
+                borderRadius: '12px', 
+                padding: '14px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '4px'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Eye size={14} color="var(--color-good)" />
+                  <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--color-good)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Detected</span>
+                </div>
+                <span style={{ fontSize: '24px', fontWeight: 800, color: 'var(--color-text-primary)' }}>{stats.totalDetected}</span>
+              </div>
+
+              <div style={{ 
+                background: 'rgba(245, 158, 11, 0.08)', 
+                borderRadius: '12px', 
+                padding: '14px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '4px'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <BarChart3 size={14} color="var(--color-warning)" />
+                  <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--color-warning)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Detection</span>
+                </div>
+                <span style={{ fontSize: '24px', fontWeight: 800, color: 'var(--color-text-primary)' }}>{stats.detectionRate}%</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Main Fish List details with controls */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
         {fishList.map(fish => {
           const display = getSpeciesDisplay(fish);
           const isEditing = editingFishId === fish.id;
@@ -226,6 +432,7 @@ export const MyFishScreen: React.FC = () => {
             </div>
           );
         })}
+      </div>
       </div>
 
       {/* Delete Confirmation Modal */}

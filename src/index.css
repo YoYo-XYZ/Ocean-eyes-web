@@ -293,6 +293,19 @@ h1, h2, h3, h4, h5, h6 {
   }
 }
 
+/* ─── Fish Inventory Two-Column Layout ─── */
+.fish-inventory-grid {
+  display: grid;
+  grid-template-columns: 300px 1fr;
+  gap: 24px;
+}
+
+@media (max-width: 900px) {
+  .fish-inventory-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .metrics-row {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
