@@ -350,6 +350,17 @@ h1, h2, h3, h4, h5, h6 {
   box-shadow: var(--shadow-premium);
 }
 
+.live-camera-feed:fullscreen {
+  width: 100vw !important;
+  height: 100vh !important;
+  aspect-ratio: auto !important;
+  border-radius: 0 !important;
+  border: none !important;
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+}
+
 @media (max-width: 768px) {
   .live-camera-feed {
     aspect-ratio: 16 / 9;

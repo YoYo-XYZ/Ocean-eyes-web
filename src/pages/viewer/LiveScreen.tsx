@@ -1,5 +1,5 @@
 /* eslint-disable react-hooks/set-state-in-effect */
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
 import { MockFirestore } from '../../services/mock_service';
 import type { CameraFilters, FilterPreset } from '../../types/aquarium';
@@ -15,7 +15,9 @@ import {
   Trash2,
   ChevronDown,
   ChevronUp,
-  Ruler
+  Ruler,
+  Maximize,
+  Minimize
 } from 'lucide-react';
 
 const DEFAULT_PRESETS: FilterPreset[] = [
@@ -55,6 +57,32 @@ export const LiveScreen: React.FC = () => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [liveState?.is_live]);
+
+  // Fullscreen state and handlers
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const viewportRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    };
+  }, []);
+
+  const toggleFullscreen = () => {
+    if (!viewportRef.current) return;
+    if (!document.fullscreenElement) {
+      viewportRef.current.requestFullscreen().catch(err => {
+        console.error(`Error entering fullscreen: ${err.message}`);
+      });
+    } else {
+      document.exitFullscreen();
+    }
+  };
+
   const [zoomLevel, setZoomLevel] = useState(1.0);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
@@ -879,6 +907,7 @@ Diagnostics:
       ) : (
         /* Simulated Video Frame */
         <div 
+          ref={viewportRef}
           className="live-camera-feed" 
           style={{ 
             marginBottom: '24px', 
@@ -1078,6 +1107,20 @@ Diagnostics:
                   title={isRecording ? "Stop Recording" : "Start Recording"}
                 >
                   {isRecording ? <Square size={14} /> : <Video size={16} />}
+                </button>
+
+                {/* Fullscreen Button */}
+                <button 
+                  className="camera-control-btn"
+                  onClick={toggleFullscreen}
+                  title={isFullscreen ? "Exit Fullscreen" : "Enter Fullscreen"}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}
+                >
+                  {isFullscreen ? <Minimize size={16} /> : <Maximize size={16} />}
                 </button>
               </div>
 
