@@ -209,7 +209,7 @@ export const MyFishScreen: React.FC = () => {
 
       {/* Add New Fish Species Form */}
       {showAddForm && (
-        <form onSubmit={handleAdd} className="card-decoration" style={{ padding: '20px', marginBottom: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+        <form onSubmit={handleAdd} className="card-decoration" style={{ padding: '20px', marginBottom: '20px', display: 'flex', flexDirection: 'column', gap: '14px', position: 'relative', zIndex: 10 }}>
           <h4 style={{ fontSize: '14px', fontWeight: 700 }}>Add New Species Entry</h4>
           
           <div>
