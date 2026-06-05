@@ -7,10 +7,10 @@ import { getSpeciesById, getSpeciesColor, getSpeciesInitials, type SpeciesInfo }
 export const MyFishScreen: React.FC = () => {
   const { fishList, addFish, removeFish, updateFishCount, updateFishSpecies, setActiveTab } = useApp();
   const [name, setName] = useState('');
-  const [count, setCount] = useState(3);
   const [selectedSpeciesId, setSelectedSpeciesId] = useState<string | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingFishId, setEditingFishId] = useState<string | null>(null);
+  const [fishToDelete, setFishToDelete] = useState<string | null>(null);
 
   const handleAdd = (e: React.FormEvent) => {
     e.preventDefault();
@@ -19,9 +19,8 @@ export const MyFishScreen: React.FC = () => {
     const species = selectedSpeciesId ? getSpeciesById(selectedSpeciesId) : null;
     const imageUrl = species ? species.imageClass : 'species-unknown';
     
-    addFish(name.trim(), imageUrl, count);
+    addFish(name.trim(), imageUrl, 1);
     setName('');
-    setCount(3);
     setSelectedSpeciesId(null);
     setShowAddForm(false);
   };
@@ -99,28 +98,6 @@ export const MyFishScreen: React.FC = () => {
             />
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '16px' }}>
-            <div>
-              <label style={{ display: 'block', fontSize: '11px', color: 'var(--color-text-secondary)', marginBottom: '4px', fontWeight: 600 }}>EXPECTED QUANTITY</label>
-              <input 
-                type="number" 
-                min="1" 
-                max="20" 
-                value={count} 
-                onChange={e => setCount(parseInt(e.target.value))} 
-                style={{
-                  width: '100%',
-                  padding: '10px 12px',
-                  borderRadius: '8px',
-                  border: '1px solid var(--color-border)',
-                  fontFamily: 'var(--font-main)',
-                  fontSize: '14px',
-                  outline: 'none'
-                }}
-              />
-            </div>
-          </div>
-
           <div style={{ display: 'flex', gap: '10px', marginTop: '6px' }}>
             <button className="primary-button" style={{ flex: 1, padding: '10px', fontSize: '13px' }} type="submit">
               Add Species
@@ -132,7 +109,6 @@ export const MyFishScreen: React.FC = () => {
               onClick={() => {
                 setShowAddForm(false);
                 setName('');
-                setCount(3);
                 setSelectedSpeciesId(null);
               }}
             >
@@ -238,7 +214,7 @@ export const MyFishScreen: React.FC = () => {
                     {/* Trash delete */}
                     <button 
                       style={{ background: 'none', border: 'none', color: '#94A3B8', cursor: 'pointer', display: 'flex', padding: '4px' }}
-                      onClick={() => removeFish(fish.id)}
+                      onClick={() => setFishToDelete(fish.id)}
                       onMouseEnter={e => (e.currentTarget.style.color = 'var(--color-critical)')}
                       onMouseLeave={e => (e.currentTarget.style.color = '#94A3B8')}
                     >
@@ -251,6 +227,44 @@ export const MyFishScreen: React.FC = () => {
           );
         })}
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {fishToDelete && (
+        <div className="modal-overlay" onClick={() => setFishToDelete(null)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()}>
+            <h3 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '8px' }}>Delete Fish Entry</h3>
+            <p style={{ fontSize: '14px', color: 'var(--color-text-secondary)', marginBottom: '24px' }}>
+              Are you sure you want to delete this fish entry? This action cannot be undone.
+            </p>
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+              <button 
+                className="secondary-button"
+                style={{ padding: '10px 20px', fontSize: '14px' }}
+                onClick={() => setFishToDelete(null)}
+              >
+                Cancel
+              </button>
+              <button 
+                className="primary-button"
+                style={{ 
+                  padding: '10px 20px', 
+                  fontSize: '14px', 
+                  backgroundColor: 'var(--color-critical)',
+                  boxShadow: '0 4px 12px rgba(239, 68, 68, 0.15)'
+                }}
+                onClick={() => {
+                  if (fishToDelete) {
+                    removeFish(fishToDelete);
+                    setFishToDelete(null);
+                  }
+                }}
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
