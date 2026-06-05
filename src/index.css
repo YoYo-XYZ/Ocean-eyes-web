@@ -31,6 +31,7 @@
   --calibration-bg: linear-gradient(180deg, #0F172A 0%, #115E59 100%);
   --color-camera-bg: #020617;
   --color-camera-border: rgba(255, 255, 255, 0.05);
+  --color-dropdown-bg: #FFFFFF;
 }
 
 body.dark {
@@ -60,6 +61,12 @@ body.dark {
   --calibration-bg: linear-gradient(180deg, #050827 0%, #004f95 100%);
   --color-camera-bg: #050827;
   --color-camera-border: rgba(0, 240, 255, 0.15);
+  --color-dropdown-bg: #0f113a;
+}
+
+select, option {
+  background-color: var(--color-dropdown-bg);
+  color: var(--color-text-primary);
 }
 
 * {

@@ -174,11 +174,11 @@ export const HomeScreen: React.FC = () => {
               }}
             >
               {tanks.filter(t => linkedTanks.includes(t.id)).map(t => (
-                <option key={t.id} value={t.id} style={{ fontSize: '14px', fontWeight: 600, backgroundColor: 'var(--color-surface)' }}>
+                <option key={t.id} value={t.id} style={{ fontSize: '14px', fontWeight: 600, backgroundColor: 'var(--color-dropdown-bg)' }}>
                   {t.name}
                 </option>
               ))}
-              <option value="add-new-tank-action" style={{ fontSize: '14px', fontWeight: 700, color: 'var(--color-primary)', backgroundColor: 'var(--color-surface)' }}>
+              <option value="add-new-tank-action" style={{ fontSize: '14px', fontWeight: 700, color: 'var(--color-primary)', backgroundColor: 'var(--color-dropdown-bg)' }}>
                 + Add Tank...
               </option>
             </select>
@@ -289,7 +289,7 @@ export const HomeScreen: React.FC = () => {
                       padding: '4px 8px',
                       borderRadius: '8px',
                       border: '1px solid var(--color-border)',
-                      backgroundColor: 'var(--color-surface)',
+                      backgroundColor: 'var(--color-dropdown-bg)',
                       color: 'var(--color-text-primary)',
                       fontFamily: 'var(--font-main)',
                       fontSize: '12px',
