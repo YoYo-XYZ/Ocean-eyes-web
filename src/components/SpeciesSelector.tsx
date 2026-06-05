@@ -6,12 +6,14 @@ interface SpeciesSelectorProps {
   selectedSpeciesId: string | null;
   onSelect: (species: SpeciesInfo | null, customName?: string) => void;
   placeholder?: string;
+  excludeSpeciesIds?: string[];
 }
 
-export const SpeciesSelector: React.FC<SpeciesSelectorProps> = ({ 
-  selectedSpeciesId, 
+export const SpeciesSelector: React.FC<SpeciesSelectorProps> = ({
+  selectedSpeciesId,
   onSelect,
-  placeholder = 'Search for a species...'
+  placeholder = 'Search for a species...',
+  excludeSpeciesIds = []
 }) => {
   const [query, setQuery] = useState('');
   const [isOpen, setIsOpen] = useState(false);
@@ -19,7 +21,10 @@ export const SpeciesSelector: React.FC<SpeciesSelectorProps> = ({
   const inputRef = useRef<HTMLInputElement>(null);
 
   const selectedSpecies = selectedSpeciesId ? SPECIES_CATALOG.find((s: SpeciesInfo) => s.id === selectedSpeciesId) : null;
-  const filteredSpecies = useMemo(() => searchSpecies(query), [query]);
+  const filteredSpecies = useMemo(() => {
+    const results = searchSpecies(query);
+    return results.filter(s => !excludeSpeciesIds.includes(s.id));
+  }, [query, excludeSpeciesIds]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {

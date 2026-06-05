@@ -266,7 +266,258 @@ export const HomeScreen: React.FC = () => {
             </div>
           </div>
 
-          {/* Water Chemistry Grid */}
+          {/* Combined Monitoring Section */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+            
+            {/* Live Feed Monitor */}
+            <div className="card-decoration" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <h3 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--color-text-primary)', margin: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Video size={16} style={{ color: 'var(--color-primary)' }} />
+                  <span>Live Feed Monitor</span>
+                </h3>
+                
+                {feeds.length > 0 && (
+                  <select
+                    value={activeFeed.id}
+                    onChange={(e) => {
+                      if (activeTank) {
+                        MockFirestore.switchActiveFeed(activeTank.id, e.target.value);
+                      }
+                    }}
+                    style={{
+                      padding: '4px 8px',
+                      borderRadius: '8px',
+                      border: '1px solid var(--color-border)',
+                      backgroundColor: 'var(--color-surface)',
+                      color: 'var(--color-text-primary)',
+                      fontFamily: 'var(--font-main)',
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      outline: 'none',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {feeds.map(f => (
+                      <option key={f.id} value={f.id}>{f.name}</option>
+                    ))}
+                  </select>
+                )}
+              </div>
+
+              {/* Viewport Frame */}
+              <div 
+                className="live-camera-feed"
+                style={{
+                  aspectRatio: '16 / 9',
+                  position: 'relative',
+                  width: '100%',
+                  borderRadius: '12px',
+                  overflow: 'hidden',
+                  display: 'flex',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  backgroundColor: 'var(--color-background)',
+                  border: '1px solid var(--color-border)'
+                }}
+              >
+                {liveState?.is_live ? (
+                  <>
+                    {/* Grid Lines */}
+                    <div className="camera-grid" />
+
+                    {/* Aquatic Render */}
+                    <div style={{
+                      width: '100%',
+                      height: '100%',
+                      backgroundImage: activeFeed.mock_image ? `url(${activeFeed.mock_image})` : 'linear-gradient(180deg, #0F766E 0%, #115E59 50%, #134E4A 100%)',
+                      backgroundSize: 'cover',
+                      backgroundPosition: 'center',
+                      position: 'absolute',
+                      overflow: 'hidden'
+                    }}>
+                      <div style={{ position: 'absolute', top: '10%', left: '10%', fontSize: '24px', opacity: 0.2 }}>🌿</div>
+                      <div style={{ position: 'absolute', bottom: '15%', right: '12%', fontSize: '32px', opacity: 0.25 }}>🍀</div>
+                    </div>
+
+                    {/* Overlays */}
+                    <div className="live-overlay-pill" style={{ left: '8px', top: '8px', padding: '3px 6px', fontSize: '9px' }}>
+                      <div className="live-badge" />
+                      <span>{activeFeed.name}</span>
+                    </div>
+
+                    <div style={{
+                      position: 'absolute',
+                      bottom: '8px',
+                      left: '8px',
+                      display: 'flex',
+                      gap: '6px',
+                      zIndex: 10
+                    }}>
+                      <div style={{ background: 'rgba(15, 23, 42, 0.85)', padding: '3px 6px', borderRadius: '6px', fontSize: '9px', color: '#FFF' }}>
+                        <strong>{displayFishCount} fish</strong>
+                      </div>
+                      <div style={{ background: 'rgba(15, 23, 42, 0.85)', padding: '3px 6px', borderRadius: '6px', fontSize: '9px', color: '#FFF' }}>
+                        <strong style={{ color: 'var(--color-info)' }}>{displayClarity.toFixed(1)} score</strong>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <div style={{ textAlign: 'center', padding: '12px' }}>
+                    <span style={{ fontSize: '24px', display: 'block', marginBottom: '4px' }}>🎥</span>
+                    <p style={{ color: 'var(--color-text-secondary)', fontSize: '12px', margin: '0 0 10px 0' }}>
+                      Feed is idle. Connect stream to monitor.
+                    </p>
+                    <button 
+                      className="primary-button" 
+                      style={{ padding: '6px 12px', fontSize: '12px', margin: '0 auto' }} 
+                      onClick={startStream}
+                    >
+                      Connect Stream
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Quick Actions */}
+              {liveState?.is_live && (
+                <div style={{ display: 'flex', gap: '8px', marginTop: '2px' }}>
+                  <button 
+                    className="secondary-button" 
+                    style={{ flex: 1, padding: '8px', fontSize: '12px', borderRadius: '8px', color: 'var(--color-critical)' }}
+                    onClick={stopStream}
+                  >
+                    Disconnect Stream
+                  </button>
+                  <button 
+                    className="primary-button" 
+                    style={{ flex: 1, padding: '8px', fontSize: '12px', borderRadius: '8px' }}
+                    onClick={() => setActiveTab('live')}
+                  >
+                    Advanced Controls
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Camera Visualizer + Fish Inventory Row */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '12px 24px', alignItems: 'start' }}>
+              
+              {/* Row 1: Headings */}
+              <h3 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--color-text-primary)', margin: 0 }}>Camera Visualizer</h3>
+              <h3 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--color-text-primary)', margin: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span>Fish Inventory Summary</span>
+                <button 
+                  onClick={() => setActiveTab('my_fish')}
+                  style={{ background: 'none', border: 'none', color: 'var(--color-primary)', fontSize: '12px', fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font-main)' }}
+                >
+                  Manage list
+                </button>
+              </h3>
+              
+              {/* Row 2: Cards */}
+              {/* Camera Visualizer */}
+              <div className="card-decoration" style={{ display: 'flex', flexDirection: 'column', cursor: 'pointer', padding: '20px' }} onClick={() => setActiveTab('my_fish')}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
+                  <div>
+                    <span style={{ fontSize: '28px', fontWeight: 800 }}>{displayFishCount}</span>
+                    <span style={{ fontSize: '13px', color: 'var(--color-text-secondary)', marginLeft: '4px' }}>fish visible</span>
+                  </div>
+                  <span style={{ fontSize: '20px', marginTop: '2px' }}>🐟</span>
+                </div>
+                <span style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>
+                  Expected Target: {fishList.reduce((sum, f) => sum + f.count, 0)} species count
+                </span>
+              </div>
+
+              {/* Fish Inventory */}
+              <div className="card-decoration" style={{ padding: '4px 20px' }}>
+                {fishList.slice(0, 3).map((fish, idx) => (
+                  <div 
+                    key={fish.id} 
+                    style={{ 
+                      display: 'flex', 
+                      justifyContent: 'space-between', 
+                      alignItems: 'center', 
+                      padding: '14px 0',
+                      borderBottom: idx === Math.min(2, fishList.length - 1) ? 'none' : '1px solid var(--color-border)'
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <div style={{
+                        width: '32px',
+                        height: '32px',
+                        borderRadius: '6px',
+                        backgroundColor: getSpeciesColor(fish.speciesId),
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: '11px',
+                        fontWeight: 700,
+                        color: '#fff',
+                        flexShrink: 0,
+                        textShadow: '0 1px 2px rgba(0,0,0,0.3)'
+                      }}>
+                        {getSpeciesInitials(fish.speciesId)}
+                      </div>
+                      <div>
+                        <span style={{ fontSize: '15px', fontWeight: 600, color: 'var(--color-text-primary)' }}>{fish.name}</span>
+                        <span style={{ fontSize: '11px', display: 'block', color: 'var(--color-text-secondary)', fontWeight: 500, marginTop: '2px' }}>
+                          Expected: {fish.count} species limit
+                        </span>
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <span style={{
+                        fontSize: '11px',
+                        backgroundColor: fish.detected === fish.count ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+                        color: fish.detected === fish.count ? 'var(--color-good)' : 'var(--color-critical)',
+                        padding: '2px 8px',
+                        borderRadius: '10px',
+                        fontWeight: 600
+                      }}>
+                        {fish.detected === fish.count ? 'All Visible' : `${fish.detected} / ${fish.count} detected`}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Right Column (Side Stats & Alerts) */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          
+          {/* Water Clarity */}
+          <div>
+            <h3 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--color-text-primary)', marginBottom: '12px' }}>Water Clarity</h3>
+            
+            {/* Water Clarity Metric Card */}
+            <div className="card-decoration" style={{ display: 'flex', flexDirection: 'column', cursor: 'pointer' }} onClick={() => setActiveTab('history')}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
+                <div>
+                  <span style={{ fontSize: '28px', fontWeight: 800 }}>{displayClarity.toFixed(1)}</span>
+                  <span style={{ fontSize: '13px', color: 'var(--color-text-secondary)', marginLeft: '4px' }}>/10 score</span>
+                </div>
+                <Droplet size={20} style={{ color: 'var(--color-info)', marginTop: '4px' }} />
+              </div>
+              {/* Mini Sparkline Chart representing historical clarity */}
+              <div style={{ height: '32px' }}>
+                <svg width="100%" height="32" style={{ overflow: 'visible' }}>
+                  <polyline
+                    fill="none"
+                    stroke="var(--color-info)"
+                    strokeWidth="2"
+                    points="0,28 30,24 60,30 90,20 120,22 150,14 180,10 210,16"
+                    strokeLinecap="round"
+                  />
+                </svg>
+              </div>
+            </div>
+          </div>
+
+          {/* Water Chemistry Parameters */}
           <div>
             <h3 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--color-text-primary)', marginBottom: '12px' }}>Water Chemistry Parameters</h3>
             <div className="chemistry-grid">
@@ -314,249 +565,6 @@ export const HomeScreen: React.FC = () => {
                 </div>
               </div>
             </div>
-          </div>
-
-          {/* Fish Inventory list */}
-          <div>
-            <h3 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--color-text-primary)', marginBottom: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span>Fish Inventory Summary</span>
-              <button 
-                onClick={() => setActiveTab('my_fish')}
-                style={{ background: 'none', border: 'none', color: 'var(--color-primary)', fontSize: '12px', fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font-main)' }}
-              >
-                Manage list
-              </button>
-            </h3>
-            
-            <div className="card-decoration" style={{ padding: '4px 20px' }}>
-              {fishList.map((fish, idx) => (
-                <div 
-                  key={fish.id} 
-                  style={{ 
-                    display: 'flex', 
-                    justifyContent: 'space-between', 
-                    alignItems: 'center', 
-                    padding: '14px 0',
-                    borderBottom: idx === fishList.length - 1 ? 'none' : '1px solid var(--color-border)'
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <div style={{
-                      width: '32px',
-                      height: '32px',
-                      borderRadius: '6px',
-                      backgroundColor: getSpeciesColor(fish.speciesId),
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: '11px',
-                      fontWeight: 700,
-                      color: '#fff',
-                      flexShrink: 0,
-                      textShadow: '0 1px 2px rgba(0,0,0,0.3)'
-                    }}>
-                      {getSpeciesInitials(fish.speciesId)}
-                    </div>
-                    <div>
-                      <span style={{ fontSize: '15px', fontWeight: 600, color: 'var(--color-text-primary)' }}>{fish.name}</span>
-                      <span style={{ fontSize: '11px', display: 'block', color: 'var(--color-text-secondary)', fontWeight: 500, marginTop: '2px' }}>
-                        Expected: {fish.count} species limit
-                      </span>
-                    </div>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <span style={{
-                      fontSize: '11px',
-                      backgroundColor: fish.detected === fish.count ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
-                      color: fish.detected === fish.count ? 'var(--color-good)' : 'var(--color-critical)',
-                      padding: '2px 8px',
-                      borderRadius: '10px',
-                      fontWeight: 600
-                    }}>
-                      {fish.detected === fish.count ? 'All Visible' : `${fish.detected} / ${fish.count} detected`}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Right Column (Side Stats & Alerts) */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-          
-          {/* Key Metrics Dashboard cards */}
-          <div className="metrics-row" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            
-            {/* Water Clarity Metric Card */}
-            <div className="card-decoration" style={{ display: 'flex', flexDirection: 'column', gap: '10px', cursor: 'pointer', flex: 1 }} onClick={() => setActiveTab('history')}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '13px', color: 'var(--color-text-secondary)', fontWeight: 600 }}>Water Clarity</span>
-                <Droplet size={18} style={{ color: 'var(--color-info)' }} />
-              </div>
-              <div>
-                <span style={{ fontSize: '24px', fontWeight: 800 }}>{displayClarity.toFixed(1)}</span>
-                <span style={{ fontSize: '13px', color: 'var(--color-text-secondary)', marginLeft: '4px' }}>/10 score</span>
-              </div>
-              {/* Mini Sparkline Chart representing historical clarity */}
-              <div style={{ height: '24px', marginTop: '6px' }}>
-                <svg width="100%" height="24" style={{ overflow: 'visible' }}>
-                  <polyline
-                    fill="none"
-                    stroke="var(--color-info)"
-                    strokeWidth="2"
-                    points="0,20 30,18 60,22 90,15 120,17 150,10 180,8 210,12"
-                    strokeLinecap="round"
-                  />
-                </svg>
-              </div>
-            </div>
-
-            {/* Fish Count Metric Card */}
-            <div className="card-decoration" style={{ display: 'flex', flexDirection: 'column', gap: '10px', cursor: 'pointer', flex: 1 }} onClick={() => setActiveTab('my_fish')}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '13px', color: 'var(--color-text-secondary)', fontWeight: 600 }}>Camera Visualizer</span>
-                <span style={{ fontSize: '18px' }}>🐟</span>
-              </div>
-              <div>
-                <span style={{ fontSize: '24px', fontWeight: 800 }}>{displayFishCount}</span>
-                <span style={{ fontSize: '13px', color: 'var(--color-text-secondary)', marginLeft: '4px' }}>fish visible</span>
-              </div>
-              <span style={{ fontSize: '12px', color: 'var(--color-text-secondary)', display: 'block', marginTop: '8px' }}>
-                Expected Target: {fishList.reduce((sum, f) => sum + f.count, 0)} species count
-              </span>
-            </div>
-          </div>
-
-          {/* Live Monitor Viewport Card */}
-          <div className="card-decoration" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h3 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--color-text-primary)', margin: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <Video size={16} style={{ color: 'var(--color-primary)' }} />
-                <span>Live Feed Monitor</span>
-              </h3>
-              
-              {feeds.length > 0 && (
-                <select
-                  value={activeFeed.id}
-                  onChange={(e) => {
-                    if (activeTank) {
-                      MockFirestore.switchActiveFeed(activeTank.id, e.target.value);
-                    }
-                  }}
-                  style={{
-                    padding: '4px 8px',
-                    borderRadius: '8px',
-                    border: '1px solid var(--color-border)',
-                    backgroundColor: 'var(--color-surface)',
-                    color: 'var(--color-text-primary)',
-                    fontFamily: 'var(--font-main)',
-                    fontSize: '12px',
-                    fontWeight: 600,
-                    outline: 'none',
-                    cursor: 'pointer'
-                  }}
-                >
-                  {feeds.map(f => (
-                    <option key={f.id} value={f.id}>{f.name}</option>
-                  ))}
-                </select>
-              )}
-            </div>
-
-            {/* Viewport Frame */}
-            <div 
-              className="live-camera-feed"
-              style={{
-                aspectRatio: '16 / 9',
-                position: 'relative',
-                width: '100%',
-                borderRadius: '12px',
-                overflow: 'hidden',
-                display: 'flex',
-                justifyContent: 'center',
-                alignItems: 'center',
-                backgroundColor: 'var(--color-background)',
-                border: '1px solid var(--color-border)'
-              }}
-            >
-              {liveState?.is_live ? (
-                <>
-                  {/* Grid Lines */}
-                  <div className="camera-grid" />
-
-                  {/* Aquatic Render */}
-                  <div style={{
-                    width: '100%',
-                    height: '100%',
-                    backgroundImage: activeFeed.mock_image ? `url(${activeFeed.mock_image})` : 'linear-gradient(180deg, #0F766E 0%, #115E59 50%, #134E4A 100%)',
-                    backgroundSize: 'cover',
-                    backgroundPosition: 'center',
-                    position: 'absolute',
-                    overflow: 'hidden'
-                  }}>
-                    <div style={{ position: 'absolute', top: '10%', left: '10%', fontSize: '24px', opacity: 0.2 }}>🌿</div>
-                    <div style={{ position: 'absolute', bottom: '15%', right: '12%', fontSize: '32px', opacity: 0.25 }}>🍀</div>
-                  </div>
-
-                  {/* Overlays */}
-                  <div className="live-overlay-pill" style={{ left: '8px', top: '8px', padding: '3px 6px', fontSize: '9px' }}>
-                    <div className="live-badge" />
-                    <span>{activeFeed.name}</span>
-                  </div>
-
-                  <div style={{
-                    position: 'absolute',
-                    bottom: '8px',
-                    left: '8px',
-                    display: 'flex',
-                    gap: '6px',
-                    zIndex: 10
-                  }}>
-                    <div style={{ background: 'rgba(15, 23, 42, 0.85)', padding: '3px 6px', borderRadius: '6px', fontSize: '9px', color: '#FFF' }}>
-                      <strong>{displayFishCount} fish</strong>
-                    </div>
-                    <div style={{ background: 'rgba(15, 23, 42, 0.85)', padding: '3px 6px', borderRadius: '6px', fontSize: '9px', color: '#FFF' }}>
-                      <strong style={{ color: 'var(--color-info)' }}>{displayClarity.toFixed(1)} score</strong>
-                    </div>
-                  </div>
-                </>
-              ) : (
-                <div style={{ textAlign: 'center', padding: '12px' }}>
-                  <span style={{ fontSize: '24px', display: 'block', marginBottom: '4px' }}>🎥</span>
-                  <p style={{ color: 'var(--color-text-secondary)', fontSize: '12px', margin: '0 0 10px 0' }}>
-                    Feed is idle. Connect stream to monitor.
-                  </p>
-                  <button 
-                    className="primary-button" 
-                    style={{ padding: '6px 12px', fontSize: '12px', margin: '0 auto' }} 
-                    onClick={startStream}
-                  >
-                    Connect Stream
-                  </button>
-                </div>
-              )}
-            </div>
-
-            {/* Quick Actions */}
-            {liveState?.is_live && (
-              <div style={{ display: 'flex', gap: '8px', marginTop: '2px' }}>
-                <button 
-                  className="secondary-button" 
-                  style={{ flex: 1, padding: '8px', fontSize: '12px', borderRadius: '8px', color: 'var(--color-critical)' }}
-                  onClick={stopStream}
-                >
-                  Disconnect Stream
-                </button>
-                <button 
-                  className="primary-button" 
-                  style={{ flex: 1, padding: '8px', fontSize: '12px', borderRadius: '8px' }}
-                  onClick={() => setActiveTab('live')}
-                >
-                  Advanced Controls
-                </button>
-              </div>
-            )}
           </div>
 
           {/* Active Alerts section */}
