@@ -38,7 +38,8 @@ export const SPECIES_CATALOG: SpeciesInfo[] = [
 ];
 
 export const getSpeciesById = (id: string): SpeciesInfo | undefined => {
-  return SPECIES_CATALOG.find(s => s.id === id);
+  return SPECIES_CATALOG.find(s => s.id === id) ||
+         SPECIES_CATALOG.find(s => s.id === id.replace(/-/g, '_'));
 };
 
 export const getSpeciesByName = (name: string): SpeciesInfo | undefined => {

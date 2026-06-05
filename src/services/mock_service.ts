@@ -443,7 +443,7 @@ export class MockFirestore {
 
   static addFish(_tankId: string, name: string, imageUrl: string, count: number) {
     const fish = this.getFish();
-    const speciesId = name.toLowerCase().replace(/\s+/g, '-');
+    const speciesId = name.toLowerCase().replace(/\s+/g, '_');
 
     // Check if this species already exists
     const existingIndex = fish.findIndex(f => f.speciesId === speciesId);
@@ -482,7 +482,7 @@ export class MockFirestore {
     if (index !== -1) {
       fish[index].name = name;
       fish[index].imageUrl = imageUrl;
-      fish[index].speciesId = name.toLowerCase().replace(/\s+/g, '-');
+      fish[index].speciesId = name.toLowerCase().replace(/\s+/g, '_');
       this.saveFish(fish);
     }
   }

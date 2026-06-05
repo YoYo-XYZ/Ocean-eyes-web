@@ -133,43 +133,43 @@ export const MyFishScreen: React.FC = () => {
   };
 
   const FishThumbnail: React.FC<{ imagePath?: string; initials: string; color: string }> = ({ imagePath, initials, color }) => {
-    const [hasError, setHasError] = useState(false);
-    if (!imagePath || hasError) {
-      return (
-        <div
-          style={{
-            width: '40px',
-            height: '40px',
-            borderRadius: '8px',
-            backgroundColor: color,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: '12px',
-            fontWeight: 700,
-            color: '#fff',
-            flexShrink: 0,
-            textShadow: '0 1px 2px rgba(0,0,0,0.3)'
-          }}
-        >
-          {initials}
-        </div>
-      );
-    }
+  const [hasError, setHasError] = useState(false);
+  if (!imagePath || hasError) {
     return (
-      <img
-        src={imagePath}
-        alt={initials}
+      <div
         style={{
-          width: '56px',
+          width: '40px',
           height: '40px',
-          objectFit: 'contain',
-          flexShrink: 0
+          borderRadius: '8px',
+          backgroundColor: color,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontSize: '12px',
+          fontWeight: 700,
+          color: '#fff',
+          flexShrink: 0,
+          textShadow: '0 1px 2px rgba(0,0,0,0.3)'
         }}
-        onError={() => setHasError(true)}
-      />
+      >
+        {initials}
+      </div>
     );
-  };
+  }
+  return (
+    <img
+      src={imagePath}
+      alt={initials}
+      style={{
+        width: '40px',
+        height: '40px',
+        objectFit: 'contain',
+        flexShrink: 0
+      }}
+      onError={() => setHasError(true)}
+    />
+  );
+};
 
   const getSpeciesDisplay = (fish: typeof fishList[0]) => {
     const species = getSpeciesById(fish.speciesId);
@@ -234,6 +234,7 @@ export const MyFishScreen: React.FC = () => {
     <div style={{ padding: '0 20px 30px 20px' }}>
       <div className="canvas-header" style={{ marginBottom: '24px' }}>
         <button 
+          aria-label="Go back to home"
           style={{ background: 'none', border: 'none', color: 'var(--color-primary)', fontSize: '14px', fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font-main)' }}
           onClick={() => setActiveTab('home')}
         >
@@ -241,6 +242,7 @@ export const MyFishScreen: React.FC = () => {
         </button>
         <h1 className="canvas-title" style={{ fontSize: '24px' }}>Fish Inventory</h1>
         <button 
+          aria-label={showAddForm ? 'Close add fish form' : 'Add new fish'}
           style={{
             background: 'none',
             border: 'none',
@@ -256,13 +258,15 @@ export const MyFishScreen: React.FC = () => {
 
       {/* Add New Fish Species Form */}
       <div style={{
-        maxHeight: showAddForm ? '400px' : '0px',
+        maxHeight: showAddForm ? '500px' : '0px',
         opacity: showAddForm ? 1 : 0,
-        overflow: 'hidden',
+        overflow: showAddForm ? 'visible' : 'hidden',
         transition: 'max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease, transform 0.4s cubic-bezier(0.4, 0, 0.2, 1), margin 0.4s ease',
         transform: showAddForm ? 'translateY(0)' : 'translateY(-12px)',
         marginBottom: showAddForm ? '20px' : '0px',
-        transformOrigin: 'top center'
+        transformOrigin: 'top center',
+        position: 'relative',
+        zIndex: 50
       }}>
         <form onSubmit={handleAdd} className="card-decoration" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px', position: 'relative', zIndex: 10 }}>
           <h4 style={{ fontSize: '14px', fontWeight: 700 }}>Add New Species Entry</h4>
@@ -273,6 +277,7 @@ export const MyFishScreen: React.FC = () => {
               selectedSpeciesId={selectedSpeciesId}
               onSelect={handleSpeciesSelect}
               placeholder="Search or select a species..."
+              excludeSpeciesIds={fishList.map(f => f.speciesId)}
             />
           </div>
 
@@ -389,26 +394,76 @@ export const MyFishScreen: React.FC = () => {
             <div 
               key={fish.id} 
               className="card-decoration fish-card" 
-              style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', cursor: 'pointer' }}
+              style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px', cursor: 'pointer' }}
               onClick={() => {
                 if (!isActive) {
                   setActiveFishId(fish.id);
+                } else {
+                  setActiveFishId(null);
                 }
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1 }}>
                 <FishThumbnail imagePath={display.imagePath} initials={display.initials} color={display.color} />
                 <div style={{ flex: 1 }}>
-                  <>
-                    <strong style={{ fontSize: '16px', color: 'var(--color-text-primary)' }}>{display.name}</strong>
-                    <span style={{ display: 'block', fontSize: '12px', color: 'var(--color-text-secondary)', marginTop: '2px' }}>
-                      Current Visibility: {fish.detected} / {fish.count}
-                    </span>
-                  </>
+                  <strong style={{ fontSize: '16px', color: 'var(--color-text-primary)' }}>{display.name}</strong>
+                  <span style={{ display: 'block', fontSize: '12px', color: 'var(--color-text-secondary)', marginTop: '2px' }}>
+                    Current Visibility: {fish.detected} / {fish.count}
+                  </span>
                 </div>
               </div>
               
               <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }} onClick={e => e.stopPropagation()}>
+                {/* Visibility Donut Chart */}
+                {(() => {
+                  const visibilityPercent = fish.count > 0 ? Math.round((fish.detected / fish.count) * 100) : 0;
+                  const barColor = visibilityPercent >= 80 ? '#16A34A' : visibilityPercent >= 50 ? '#D97706' : '#DC2626';
+                  const radius = 20;
+                  const circumference = 2 * Math.PI * radius;
+                  const dashLength = (circumference * visibilityPercent) / 100;
+                  const gapLength = circumference - dashLength;
+                  
+                  return (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <div style={{ position: 'relative', width: '44px', height: '44px' }}>
+                        <svg width="44" height="44" viewBox="0 0 44 44" style={{ overflow: 'visible' }}>
+                          <circle
+                            cx="22"
+                            cy="22"
+                            r={radius}
+                            fill="none"
+                            stroke="#E2E8F0"
+                            strokeWidth="5"
+                          />
+                          <circle
+                            cx="22"
+                            cy="22"
+                            r={radius}
+                            fill="none"
+                            stroke={barColor}
+                            strokeWidth="5"
+                            strokeDasharray={`${dashLength} ${gapLength}`}
+                            strokeLinecap="round"
+                            transform="rotate(-90 22 22)"
+                            style={{ transition: 'stroke-dasharray 0.3s ease' }}
+                          />
+                        </svg>
+                        <div style={{
+                          position: 'absolute',
+                          top: '50%',
+                          left: '50%',
+                          transform: 'translate(-50%, -50%)'
+                        }}>
+                          <Eye size={16} color={barColor} />
+                        </div>
+                      </div>
+                      <span style={{ fontSize: '13px', fontWeight: 700, color: barColor, minWidth: '40px' }}>
+                        {visibilityPercent}%
+                      </span>
+                    </div>
+                  );
+                })()}
+                
                 {isActive && (
                   <>
                     {/* Incrementor/Decrementor */}
@@ -430,6 +485,7 @@ export const MyFishScreen: React.FC = () => {
 
                     {/* Trash delete */}
                     <button 
+                      aria-label="Delete fish entry"
                       style={{ background: 'none', border: 'none', color: '#94A3B8', cursor: 'pointer', display: 'flex', padding: '4px' }}
                       onClick={() => setFishToDelete(fish.id)}
                       onMouseEnter={e => (e.currentTarget.style.color = 'var(--color-critical)')}
