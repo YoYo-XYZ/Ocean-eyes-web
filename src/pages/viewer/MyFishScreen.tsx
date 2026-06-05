@@ -1,6 +1,6 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
-import { Plus, Trash2, Pencil, X, Fish, Eye, Hash, BarChart3 } from 'lucide-react';
+import { Plus, Trash2, Fish, Eye, Hash, BarChart3 } from 'lucide-react';
 import { SpeciesSelector } from '../../components/SpeciesSelector';
 import { getSpeciesById, getSpeciesColor, getSpeciesInitials, type SpeciesInfo } from '../../data/speciesCatalog';
 
@@ -87,12 +87,27 @@ const DonutChart: React.FC<DonutChartProps> = ({ speciesDistribution }) => {
 };
 
 export const MyFishScreen: React.FC = () => {
-  const { fishList, addFish, removeFish, updateFishCount, updateFishSpecies, setActiveTab } = useApp();
+  const { fishList, addFish, removeFish, updateFishCount, setActiveTab } = useApp();
   const [name, setName] = useState('');
   const [selectedSpeciesId, setSelectedSpeciesId] = useState<string | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
-  const [editingFishId, setEditingFishId] = useState<string | null>(null);
+  const [activeFishId, setActiveFishId] = useState<string | null>(null);
   const [fishToDelete, setFishToDelete] = useState<string | null>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      const fishCard = target.closest('.fish-card');
+      if (!fishCard) {
+        setActiveFishId(null);
+      }
+    };
+
+    if (activeFishId) {
+      document.addEventListener('click', handleClickOutside);
+      return () => document.removeEventListener('click', handleClickOutside);
+    }
+  }, [activeFishId]);
 
   const handleAdd = (e: React.FormEvent) => {
     e.preventDefault();
@@ -117,13 +132,43 @@ export const MyFishScreen: React.FC = () => {
     }
   };
 
-  const handleEditSpecies = (fishId: string, species: SpeciesInfo | null, customName?: string) => {
-    if (species) {
-      updateFishSpecies(fishId, species.name, species.imageClass);
-    } else if (customName) {
-      updateFishSpecies(fishId, customName, 'species-unknown');
+  const FishThumbnail: React.FC<{ imagePath?: string; initials: string; color: string }> = ({ imagePath, initials, color }) => {
+    const [hasError, setHasError] = useState(false);
+    if (!imagePath || hasError) {
+      return (
+        <div
+          style={{
+            width: '40px',
+            height: '40px',
+            borderRadius: '8px',
+            backgroundColor: color,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '12px',
+            fontWeight: 700,
+            color: '#fff',
+            flexShrink: 0,
+            textShadow: '0 1px 2px rgba(0,0,0,0.3)'
+          }}
+        >
+          {initials}
+        </div>
+      );
     }
-    setEditingFishId(null);
+    return (
+      <img
+        src={imagePath}
+        alt={initials}
+        style={{
+          width: '56px',
+          height: '40px',
+          objectFit: 'contain',
+          flexShrink: 0
+        }}
+        onError={() => setHasError(true)}
+      />
+    );
   };
 
   const getSpeciesDisplay = (fish: typeof fishList[0]) => {
@@ -132,13 +177,15 @@ export const MyFishScreen: React.FC = () => {
       return {
         initials: species.initials,
         color: species.color,
-        name: species.displayName
+        name: species.displayName,
+        imagePath: species.imagePath
       };
     }
     return {
       initials: getSpeciesInitials(fish.speciesId),
       color: getSpeciesColor(fish.speciesId),
-      name: fish.name
+      name: fish.name,
+      imagePath: undefined as string | undefined
     };
   };
 
@@ -208,8 +255,16 @@ export const MyFishScreen: React.FC = () => {
       </div>
 
       {/* Add New Fish Species Form */}
-      {showAddForm && (
-        <form onSubmit={handleAdd} className="card-decoration" style={{ padding: '20px', marginBottom: '20px', display: 'flex', flexDirection: 'column', gap: '14px', position: 'relative', zIndex: 10 }}>
+      <div style={{
+        maxHeight: showAddForm ? '400px' : '0px',
+        opacity: showAddForm ? 1 : 0,
+        overflow: 'hidden',
+        transition: 'max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease, transform 0.4s cubic-bezier(0.4, 0, 0.2, 1), margin 0.4s ease',
+        transform: showAddForm ? 'translateY(0)' : 'translateY(-12px)',
+        marginBottom: showAddForm ? '20px' : '0px',
+        transformOrigin: 'top center'
+      }}>
+        <form onSubmit={handleAdd} className="card-decoration" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px', position: 'relative', zIndex: 10 }}>
           <h4 style={{ fontSize: '14px', fontWeight: 700 }}>Add New Species Entry</h4>
           
           <div>
@@ -239,7 +294,7 @@ export const MyFishScreen: React.FC = () => {
             </button>
           </div>
         </form>
-      )}
+      </div>
 
       {/* Two-column layout: Left sidebar + Fish list */}
       <div className="fish-inventory-grid">
@@ -328,78 +383,34 @@ export const MyFishScreen: React.FC = () => {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
         {fishList.map(fish => {
           const display = getSpeciesDisplay(fish);
-          const isEditing = editingFishId === fish.id;
+          const isActive = activeFishId === fish.id;
 
           return (
-            <div key={fish.id} className="card-decoration" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px' }}>
+            <div 
+              key={fish.id} 
+              className="card-decoration fish-card" 
+              style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', cursor: 'pointer' }}
+              onClick={() => {
+                if (!isActive) {
+                  setActiveFishId(fish.id);
+                }
+              }}
+            >
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1 }}>
-                <div
-                  style={{
-                    width: '40px',
-                    height: '40px',
-                    borderRadius: '8px',
-                    backgroundColor: display.color,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: '12px',
-                    fontWeight: 700,
-                    color: '#fff',
-                    flexShrink: 0,
-                    textShadow: '0 1px 2px rgba(0,0,0,0.3)'
-                  }}
-                >
-                  {display.initials}
-                </div>
+                <FishThumbnail imagePath={display.imagePath} initials={display.initials} color={display.color} />
                 <div style={{ flex: 1 }}>
-                  {isEditing ? (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                      <SpeciesSelector
-                        selectedSpeciesId={fish.speciesId}
-                        onSelect={(species, customName) => handleEditSpecies(fish.id, species, customName)}
-                        placeholder="Change species..."
-                      />
-                      <div style={{ display: 'flex', gap: '6px' }}>
-                        <button
-                          type="button"
-                          onClick={() => setEditingFishId(null)}
-                          style={{
-                            padding: '4px 8px',
-                            border: 'none',
-                            background: 'none',
-                            cursor: 'pointer',
-                            color: 'var(--color-text-secondary)',
-                            fontSize: '12px'
-                          }}
-                        >
-                          <X size={14} />
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <>
-                      <strong style={{ fontSize: '16px', color: 'var(--color-text-primary)' }}>{display.name}</strong>
-                      <span style={{ display: 'block', fontSize: '12px', color: 'var(--color-text-secondary)', marginTop: '2px' }}>
-                        Current Visibility: {fish.detected} / {fish.count}
-                      </span>
-                    </>
-                  )}
+                  <>
+                    <strong style={{ fontSize: '16px', color: 'var(--color-text-primary)' }}>{display.name}</strong>
+                    <span style={{ display: 'block', fontSize: '12px', color: 'var(--color-text-secondary)', marginTop: '2px' }}>
+                      Current Visibility: {fish.detected} / {fish.count}
+                    </span>
+                  </>
                 </div>
               </div>
               
-              <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-                {!isEditing && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }} onClick={e => e.stopPropagation()}>
+                {isActive && (
                   <>
-                    {/* Edit species button */}
-                    <button 
-                      style={{ background: 'none', border: 'none', color: '#94A3B8', cursor: 'pointer', display: 'flex', padding: '4px' }}
-                      onClick={() => setEditingFishId(fish.id)}
-                      onMouseEnter={e => (e.currentTarget.style.color = 'var(--color-primary)')}
-                      onMouseLeave={e => (e.currentTarget.style.color = '#94A3B8')}
-                    >
-                      <Pencil size={16} />
-                    </button>
-
                     {/* Incrementor/Decrementor */}
                     <div style={{ display: 'flex', alignItems: 'center', background: '#F1F5F9', borderRadius: '10px', padding: '2px' }}>
                       <button 
