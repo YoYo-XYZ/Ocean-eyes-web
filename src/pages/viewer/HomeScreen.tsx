@@ -330,7 +330,7 @@ export const HomeScreen: React.FC = () => {
                     <div style={{
                       width: '100%',
                       height: '100%',
-                      backgroundImage: activeFeed.mock_image ? `url(${activeFeed.mock_image})` : 'linear-gradient(180deg, #0F766E 0%, #115E59 50%, #134E4A 100%)',
+                      backgroundImage: activeFeed.mock_image ? `url(${activeFeed.mock_image})` : 'var(--camera-placeholder)',
                       backgroundSize: 'cover',
                       backgroundPosition: 'center',
                       position: 'absolute',

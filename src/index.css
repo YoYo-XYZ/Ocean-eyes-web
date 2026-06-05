@@ -5,8 +5,9 @@
   --color-background: #F0F7FA;
   --color-surface: #FFFFFF;
   --color-surface-hover: #F8FAFC;
-  --color-primary: #0D9488;
-  --color-primary-light: #CCFBF1;
+  --color-primary: linear-gradient(135deg, #0D9488 0%, #0F766E 100%);
+  --color-primary-hover: linear-gradient(135deg, #0F766E 0%, #115E59 100%);
+  --color-primary-light: linear-gradient(90deg, rgba(204, 251, 241, 0.8) 0%, rgba(204, 251, 241, 0.2) 100%);
   --color-primary-dark: #0F766E;
   --color-text-primary: #1A1D1F;
   --color-text-secondary: #6B7280;
@@ -24,22 +25,41 @@
   --font-main: 'Outfit', 'Inter', system-ui, -apple-system, sans-serif;
   --transition-smooth: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   --transition-spring: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.15);
+
+  --logo-gradient: linear-gradient(135deg, #2DD4BF 0%, #0D9488 100%);
+  --camera-placeholder: linear-gradient(180deg, #0F766E 0%, #115E59 50%, #134E4A 100%);
+  --calibration-bg: linear-gradient(180deg, #0F172A 0%, #115E59 100%);
+  --color-camera-bg: #020617;
+  --color-camera-border: rgba(255, 255, 255, 0.05);
 }
 
 body.dark {
-  --color-background: #0F172A;
-  --color-surface: #1E293B;
-  --color-surface-hover: #334155;
-  --color-primary: #14B8A6;
-  --color-primary-light: #115E59;
-  --color-primary-dark: #2DD4BF;
-  --color-text-primary: #F8FAFC;
-  --color-text-secondary: #94A3B8;
-  --color-text-inverse: #0F172A;
-  --color-border: #334155;
+  --color-background: radial-gradient(circle at 80% 20%, #12154d 0%, #080920 60%, #03030c 100%);
+  --color-surface: linear-gradient(145deg, #121447 0%, #07081a 100%);
+  --color-surface-hover: linear-gradient(145deg, #191c5e 0%, #0a0b24 100%);
+  --color-primary: linear-gradient(135deg, #00d2ff 0%, #005bbf 100%);
+  --color-primary-hover: linear-gradient(135deg, #3de0ff 0%, #0074d9 100%);
+  --color-primary-light: linear-gradient(90deg, rgba(0, 210, 255, 0.16) 0%, rgba(0, 210, 255, 0.02) 100%);
+  --color-primary-dark: #00ffb4;
+  --color-text-primary: #ffffff;
+  --color-text-secondary: #9ea6d4;
+  --color-text-inverse: #080920;
+  --color-border: rgba(99, 102, 241, 0.18);
   
-  --shadow-card: 0 4px 20px rgba(0, 0, 0, 0.3), 0 1px 3px rgba(0, 0, 0, 0.1);
-  --shadow-premium: 0 12px 30px rgba(0, 0, 0, 0.4);
+  --color-critical: #ff3379;
+  --color-warning: #ffd043;
+  --color-info: #007fb5;
+  --color-good: #00ffb4;
+  
+  --shadow-card: 0 4px 20px rgba(0, 210, 255, 0.04), 0 1px 3px rgba(0, 0, 0, 0.3);
+  --shadow-premium: 0 12px 40px rgba(0, 0, 0, 0.5);
+  --shadow-primary-hover: 0 6px 20px rgba(0, 210, 255, 0.35);
+
+  --logo-gradient: linear-gradient(135deg, #00ffb4 0%, #00d2ff 100%);
+  --camera-placeholder: linear-gradient(180deg, #050827 0%, #004f95 50%, #0074d9 100%);
+  --calibration-bg: linear-gradient(180deg, #050827 0%, #004f95 100%);
+  --color-camera-bg: #050827;
+  --color-camera-border: rgba(0, 240, 255, 0.15);
 }
 
 * {
@@ -50,7 +70,7 @@ body.dark {
 
 body {
   font-family: var(--font-main);
-  background-color: var(--color-background);
+  background: var(--color-background);
   color: var(--color-text-primary);
   min-height: 100vh;
   padding: 0;
@@ -87,7 +107,7 @@ h1, h2, h3, h4, h5, h6 {
 /* ─── Sidebar Navigation Panel ─── */
 .sidebar {
   width: 280px;
-  background-color: var(--color-surface);
+  background: var(--color-surface);
   border-right: 1px solid var(--color-border);
   padding: 24px;
   display: flex;
@@ -115,7 +135,7 @@ h1, h2, h3, h4, h5, h6 {
 .sidebar-logo {
   font-size: 26px;
   font-weight: 800;
-  background: linear-gradient(135deg, #2DD4BF 0%, #0D9488 100%);
+  background: var(--logo-gradient);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   display: flex;
@@ -181,12 +201,12 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .sidebar-link:hover {
-  background-color: var(--color-surface-hover);
+  background: var(--color-surface-hover);
   color: var(--color-text-primary);
 }
 
 .sidebar-link.active {
-  background-color: var(--color-primary-light);
+  background: var(--color-primary-light);
   color: var(--color-primary-dark);
 }
 
@@ -234,7 +254,7 @@ h1, h2, h3, h4, h5, h6 {
 
 /* ─── Reusable Flutter Cards ─── */
 .card-decoration {
-  background-color: var(--color-surface);
+  background: var(--color-surface);
   border-radius: 20px;
   padding: 24px;
   box-shadow: var(--shadow-card);
@@ -249,7 +269,7 @@ h1, h2, h3, h4, h5, h6 {
 
 /* Custom Buttons */
 .primary-button {
-  background-color: var(--color-primary);
+  background: var(--color-primary);
   color: var(--color-text-inverse);
   border: none;
   border-radius: 24px;
@@ -267,8 +287,8 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .primary-button:hover {
-  background-color: var(--color-primary-dark);
-  box-shadow: 0 6px 16px rgba(13, 148, 136, 0.25);
+  background: var(--color-primary-hover, var(--color-primary-dark));
+  box-shadow: var(--shadow-primary-hover, 0 6px 16px rgba(13, 148, 136, 0.25));
 }
 
 .primary-button:active {
@@ -276,7 +296,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .secondary-button {
-  background-color: var(--color-surface);
+  background: var(--color-surface);
   color: var(--color-text-primary);
   border: 1px solid var(--color-border);
   border-radius: 24px;
@@ -360,10 +380,10 @@ h1, h2, h3, h4, h5, h6 {
 .live-camera-feed {
   position: relative;
   overflow: hidden;
-  background-color: #020617;
+  background-color: var(--color-camera-bg);
   border-radius: 20px;
   aspect-ratio: 21 / 9;
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--color-camera-border);
   box-shadow: var(--shadow-premium);
 }
 
@@ -450,7 +470,7 @@ h1, h2, h3, h4, h5, h6 {
 .calibration-canvas {
   width: 100%;
   height: 380px;
-  background: linear-gradient(180deg, #0F172A 0%, #115E59 100%);
+  background: var(--calibration-bg);
   border-radius: 20px;
   border: 1.5px solid var(--color-border);
   position: relative;
@@ -729,7 +749,7 @@ h1, h2, h3, h4, h5, h6 {
   right: 0;
   max-height: 280px;
   overflow-y: auto;
-  background-color: var(--color-surface);
+  background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: 8px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
@@ -753,7 +773,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .modal-content {
-  background-color: var(--color-surface);
+  background: var(--color-surface);
   border-radius: 20px;
   padding: 28px;
   max-width: 420px;
