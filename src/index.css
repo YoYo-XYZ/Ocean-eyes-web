@@ -4,6 +4,7 @@
   /* OceanEyes Color Tokens from AppTheme.dart */
   --color-background: #F0F7FA;
   --color-surface: #FFFFFF;
+  --color-surface-hover: #F8FAFC;
   --color-primary: #0D9488;
   --color-primary-light: #CCFBF1;
   --color-primary-dark: #0F766E;
@@ -23,6 +24,22 @@
   --font-main: 'Outfit', 'Inter', system-ui, -apple-system, sans-serif;
   --transition-smooth: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   --transition-spring: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.15);
+}
+
+body.dark {
+  --color-background: #0F172A;
+  --color-surface: #1E293B;
+  --color-surface-hover: #334155;
+  --color-primary: #14B8A6;
+  --color-primary-light: #115E59;
+  --color-primary-dark: #2DD4BF;
+  --color-text-primary: #F8FAFC;
+  --color-text-secondary: #94A3B8;
+  --color-text-inverse: #0F172A;
+  --color-border: #334155;
+  
+  --shadow-card: 0 4px 20px rgba(0, 0, 0, 0.3), 0 1px 3px rgba(0, 0, 0, 0.1);
+  --shadow-premium: 0 12px 30px rgba(0, 0, 0, 0.4);
 }
 
 * {
@@ -164,7 +181,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .sidebar-link:hover {
-  background-color: #F8FAFC;
+  background-color: var(--color-surface-hover);
   color: var(--color-text-primary);
 }
 
@@ -198,7 +215,7 @@ h1, h2, h3, h4, h5, h6 {
   justify-content: space-between;
   align-items: center;
   padding-bottom: 12px;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.03);
+  border-bottom: 1px solid var(--color-border);
 }
 
 @media (max-width: 600px) {
@@ -276,7 +293,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .secondary-button:hover {
-  background-color: #F8FAFC;
+  background-color: var(--color-surface-hover);
   border-color: var(--color-text-secondary);
 }
 
@@ -449,7 +466,7 @@ h1, h2, h3, h4, h5, h6 {
   display: flex;
   flex-direction: column;
   align-items: center;
-  background: #FFFFFF;
+  background: var(--color-surface);
   padding: 24px;
   border-radius: 20px;
   border: 1px solid var(--color-border);

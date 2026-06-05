@@ -37,6 +37,8 @@ interface AppContextProps {
   triggerManualReading: () => void;
   selectedAlertId: string | null;
   setSelectedAlertId: (id: string | null) => void;
+  isDarkMode: boolean;
+  setIsDarkMode: (isDark: boolean) => void;
 }
 
 const AppContext = createContext<AppContextProps | undefined>(undefined);
@@ -46,6 +48,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [activeMode, setActiveMode] = useState<AppMode>('both'); // Default to side-by-side split screen
   const [activeTab, setActiveTab] = useState<ViewerTab>('home');
   const [selectedAlertId, setSelectedAlertId] = useState<string | null>(null);
+
+  // App Theme State
+  const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
+    const saved = localStorage.getItem('oceaneyes_darkmode');
+    return saved ? saved === 'true' : false;
+  });
+
+  useEffect(() => {
+    if (isDarkMode) {
+      document.body.classList.add('dark');
+    } else {
+      document.body.classList.remove('dark');
+    }
+    localStorage.setItem('oceaneyes_darkmode', isDarkMode ? 'true' : 'false');
+  }, [isDarkMode]);
 
   // Active Linked Tank ID
   const [tankId, setTankId] = useState<string | null>(() => {
@@ -339,7 +356,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setSimulationActive,
         triggerManualReading,
         selectedAlertId,
-        setSelectedAlertId
+        setSelectedAlertId,
+        isDarkMode,
+        setIsDarkMode
       }}
     >
       {children}
