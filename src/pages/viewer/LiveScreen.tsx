@@ -759,30 +759,7 @@ export const LiveScreen: React.FC = () => {
       ctx.scale(zoomLevel, zoomLevel);
       ctx.translate(-320, -180);
 
-      // Aquatic Emoji Elements
-      ctx.font = '36px sans-serif';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText('🌿', 80, 60);
-      ctx.fillText('🍀', 560, 280);
 
-      // Calibrated water line
-      if (activeTank?.calibration) {
-        const yPercent = activeTank.calibration.water_line_y / 240;
-        const canvasY = yPercent * 360;
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
-        ctx.lineWidth = 2;
-        ctx.setLineDash([4, 4]);
-        ctx.beginPath();
-        ctx.moveTo(0, canvasY);
-        ctx.lineTo(640, canvasY);
-        ctx.stroke();
-        ctx.setLineDash([]);
-
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
-        ctx.font = 'bold 9px monospace';
-        ctx.fillText('CALIBRATED WATER LINE', 520, canvasY - 10);
-      }
       ctx.restore();
 
       // 4. Overlays (Static HUD)
@@ -1009,38 +986,7 @@ Diagnostics:
                     zIndex: 5
                   }} />
                 )}
-                {/* Aquatic Floating Plants */}
-                <div style={{ position: 'absolute', top: '10%', left: '10%', fontSize: '48px', opacity: 0.2 }} className="anim-float-1">🌿</div>
-                <div style={{ position: 'absolute', bottom: '15%', right: '12%', fontSize: '64px', opacity: 0.25 }} className="anim-float-2">🍀</div>
 
-                {/* Water Wave Line Overlay representing Calibration */}
-                {activeFeedCalibration && (
-                  <div style={{
-                    position: 'absolute',
-                    top: `${Math.min(100, Math.max(0, (activeFeedCalibration.water_line_y / 240) * 100))}%`,
-                    left: 0,
-                    width: '100%',
-                    height: '2px',
-                    borderTop: isCalibrating ? '2px dashed var(--color-critical)' : '2px dashed rgba(255,255,255,0.4)',
-                    zIndex: 10,
-                    transition: isCalibDragging ? 'none' : 'top 0.1s ease-out'
-                  }}>
-                    <span style={{
-                      position: 'absolute',
-                      right: '10px',
-                      top: '-18px',
-                      fontSize: '9px',
-                      color: '#FFF',
-                      background: isCalibrating ? 'var(--color-critical)' : 'rgba(0,0,0,0.4)',
-                      padding: '2px 6px',
-                      borderRadius: '4px',
-                      fontWeight: 600,
-                      boxShadow: isCalibrating ? '0 0 8px rgba(239, 68, 68, 0.5)' : 'none'
-                    }}>
-                      {isCalibrating ? 'DRAG TO CALIBRATE' : 'CALIBRATED LINE'}
-                    </span>
-                  </div>
-                )}
               </div>
 
               {/* AI Detection Bounding Boxes Overlay */}
@@ -1542,7 +1488,7 @@ Diagnostics:
             onClick={() => setIsAdjustmentsExpanded(!isAdjustmentsExpanded)}
           >
             <h3 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--color-text-primary)', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span>🎨 Stream Image Adjustments</span>
+              <span>Stream Image Adjustments</span>
               {!isAdjustmentsExpanded && selectedPresetId !== 'normal' && (
                 <span style={{
                   fontSize: '11px',
