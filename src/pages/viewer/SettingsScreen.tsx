@@ -171,15 +171,15 @@ export const SettingsScreen: React.FC = () => {
         
         <div style={{ marginBottom: '16px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', marginBottom: '6px' }}>
-            <span style={{ color: 'var(--color-text-secondary)' }}>Minimum Water Clarity</span>
-            <strong style={{ color: 'var(--color-primary)' }}>{activeTank?.thresholds.clarity_min || 6.0} / 10</strong>
+            <span style={{ color: 'var(--color-text-secondary)' }}>Maximum FNU Threshold</span>
+            <strong style={{ color: 'var(--color-primary)' }}>{activeTank?.thresholds.clarity_min || 6.0} FNU</strong>
           </div>
-          <input 
-            type="range" 
-            min="4.0" 
-            max="8.0" 
-            step="0.5" 
-            value={activeTank?.thresholds.clarity_min || 6.0} 
+          <input
+            type="range"
+            min="1.0"
+            max="10.0"
+            step="0.5"
+            value={activeTank?.thresholds.clarity_min || 6.0}
             onChange={(e) => {
               const val = parseFloat(e.target.value);
               const fishPct = activeTank?.thresholds.fish_change_pct || 50.0;

@@ -2,10 +2,9 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useApp } from '../../context/AppContext';
 import { MockFirestore } from '../../services/mock_service';
-import type { CameraFilters, FilterPreset, AIPredictionResult } from '../../types/aquarium';
+import type { CameraFilters, FilterPreset, AIDetectionResult, AITurbidityResult } from '../../types/aquarium';
 import {
   Video,
-  LayoutGrid,
   Plus,
   ZoomIn,
   ZoomOut,
@@ -24,7 +23,7 @@ import {
   Loader2
 } from 'lucide-react';
 import { getSpeciesById, getSpeciesColor, getSpeciesInitials } from '../../data/speciesCatalog';
-import { isBackendAvailable, captureFrameFromUrl, sendFrameForInference } from '../../services/ai_service';
+import { isBackendAvailable, captureFrameFromUrl, sendFrameForDetection, sendFrameForTurbidity } from '../../services/ai_service';
 
 const DEFAULT_PRESETS: FilterPreset[] = [
   {
@@ -176,10 +175,14 @@ export const LiveScreen: React.FC = () => {
   // ─── AI Analysis State ─────────────────────────────────────────────────────
   const [isAIActive, setIsAIActive] = useState(false);
   const [backendAvailable, setBackendAvailable] = useState(false);
-  const [lastPrediction, setLastPrediction] = useState<AIPredictionResult | null>(null);
+  const [lastPrediction, setLastPrediction] = useState<AIDetectionResult | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
   const aiIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // ─── Turbidity Manual Measurement State ─────────────────────────────────────
+  const [lastTurbidityResult, setLastTurbidityResult] = useState<AITurbidityResult | null>(null);
+  const [turbidityLoading, setTurbidityLoading] = useState(false);
 
   // Check backend availability on mount
   useEffect(() => {
@@ -288,11 +291,7 @@ export const LiveScreen: React.FC = () => {
   // resized canvas, but the UI displays the original image with background-size: cover).
   const [imageNaturalSize, setImageNaturalSize] = useState({ width: 0, height: 0 });
 
-  // Multi-camera feeds view states
-  const [isGridView, setIsGridView] = useState(false);
-  const [showAddCameraModal, setShowAddCameraModal] = useState(false);
-  const [newCameraName, setNewCameraName] = useState('');
-  const [newCameraUrl, setNewCameraUrl] = useState('');
+
 
   // Drag and pan states for zoom
   const [isDragging, setIsDragging] = useState(false);
@@ -357,21 +356,21 @@ export const LiveScreen: React.FC = () => {
     setIsStreaming(true);
     if (activeTank) {
       const currentLive = MockFirestore.getLiveState(activeTank.id);
-      const updatedFeeds = currentLive.feeds.map(f => ({
-        ...f,
+      const feed = currentLive.feeds[0];
+      const updatedFeed = {
+        ...feed,
         is_live: true,
-        started_at: f.started_at || new Date().toISOString()
-      }));
-      const active = updatedFeeds.find(f => f.id === currentLive.selected_feed_id) || updatedFeeds[0];
+        started_at: feed.started_at || new Date().toISOString()
+      };
       MockFirestore.saveLiveState(activeTank.id, {
         is_live: true,
-        stream_url: active.stream_url,
-        started_at: active.started_at || new Date().toISOString(),
+        stream_url: updatedFeed.stream_url,
+        started_at: updatedFeed.started_at,
         last_ping_at: new Date().toISOString(),
-        current_clarity: active.current_clarity,
-        current_fish_count: active.current_fish_count,
+        current_clarity: updatedFeed.current_clarity,
+        current_fish_count: updatedFeed.current_fish_count,
         selected_feed_id: currentLive.selected_feed_id,
-        feeds: updatedFeeds
+        feeds: [updatedFeed]
       });
     }
   };
@@ -382,11 +381,12 @@ export const LiveScreen: React.FC = () => {
     setZoomLevel(1.0);
     if (activeTank) {
       const currentLive = MockFirestore.getLiveState(activeTank.id);
-      const updatedFeeds = currentLive.feeds.map(f => ({
-        ...f,
+      const feed = currentLive.feeds[0];
+      const updatedFeed = {
+        ...feed,
         is_live: false,
         started_at: null
-      }));
+      };
       MockFirestore.saveLiveState(activeTank.id, {
         is_live: false,
         stream_url: '',
@@ -395,7 +395,7 @@ export const LiveScreen: React.FC = () => {
         current_clarity: 0,
         current_fish_count: 0,
         selected_feed_id: currentLive.selected_feed_id,
-        feeds: updatedFeeds
+        feeds: [updatedFeed]
       });
     }
   };
@@ -438,17 +438,16 @@ export const LiveScreen: React.FC = () => {
       setAiError(null);
       try {
         const blob = await captureFrameFromUrl(activeFeed.mock_image, 640, 360);
-        const result = await sendFrameForInference(blob, 0.35);
+        const result = await sendFrameForDetection(blob, 0.35);
         setLastPrediction(result);
 
-        // Update MockFirestore with real AI data
+        // Update MockFirestore with real AI data (fish detection only)
         if (activeTank) {
-          const clarityScore = Math.max(0, Math.min(10, 10 - result.turbidity.fnu / 5));
           const totalFish = result.summary.total_detections;
 
           MockFirestore.writeReading({
             tankId: activeTank.id,
-            clarity: parseFloat(clarityScore.toFixed(1)),
+            clarity: activeFeed.current_clarity ?? 0,
             fishCount: totalFish,
           });
 
@@ -458,7 +457,6 @@ export const LiveScreen: React.FC = () => {
             if (f.id === activeFeed.id) {
               return {
                 ...f,
-                current_clarity: parseFloat(clarityScore.toFixed(1)),
                 current_fish_count: totalFish,
               };
             }
@@ -466,7 +464,6 @@ export const LiveScreen: React.FC = () => {
           });
           MockFirestore.saveLiveState(activeTank.id, {
             ...currentLive,
-            current_clarity: parseFloat(clarityScore.toFixed(1)),
             current_fish_count: totalFish,
             feeds: updatedFeeds,
           });
@@ -508,6 +505,49 @@ export const LiveScreen: React.FC = () => {
     setAiError(null);
   }, [backendAvailable]);
 
+  // ─── Manual Turbidity Measurement ───────────────────────────────────────────
+  const measureTurbidity = useCallback(async () => {
+    if (!activeFeed.mock_image || turbidityLoading) return;
+    setTurbidityLoading(true);
+    try {
+      const blob = await captureFrameFromUrl(activeFeed.mock_image, 640, 360);
+      const result = await sendFrameForTurbidity(blob);
+      setLastTurbidityResult(result);
+
+      // Update MockFirestore with turbidity data (store raw FNU)
+      if (activeTank) {
+        const fnuValue = result.turbidity.fnu;
+
+        MockFirestore.writeReading({
+          tankId: activeTank.id,
+          clarity: parseFloat(fnuValue.toFixed(2)),
+          fishCount: activeFeed.current_fish_count ?? 0,
+        });
+
+        // Update live state with turbidity results
+        const currentLive = MockFirestore.getLiveState(activeTank.id);
+        const updatedFeeds = currentLive.feeds.map(f => {
+          if (f.id === activeFeed.id) {
+            return {
+              ...f,
+              current_clarity: parseFloat(fnuValue.toFixed(2)),
+            };
+          }
+          return f;
+        });
+        MockFirestore.saveLiveState(activeTank.id, {
+          ...currentLive,
+          current_clarity: parseFloat(fnuValue.toFixed(2)),
+          feeds: updatedFeeds,
+        });
+      }
+    } catch (err) {
+      console.error('Turbidity measurement failed:', err);
+    } finally {
+      setTurbidityLoading(false);
+    }
+  }, [activeFeed.mock_image, activeFeed.id, activeFeed.current_fish_count, activeTank, turbidityLoading]);
+
   // Water level calibration helpers (resolving per-camera calibration first)
   const activeFeedCalibration = activeFeed?.calibration || activeTank?.calibration;
   const currentWaterLineY = activeFeedCalibration?.water_line_y ?? 120;
@@ -539,29 +579,7 @@ export const LiveScreen: React.FC = () => {
   const stateClarity = isStreaming && liveState?.is_live ? activeFeed.current_clarity : 0;
   const stateFish = isStreaming && liveState?.is_live ? activeFeed.current_fish_count : 0;
 
-  const handleAddCamera = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newCameraName.trim() || !newCameraUrl.trim()) return;
-    if (activeTank) {
-      MockFirestore.addCameraFeed(activeTank.id, newCameraName.trim(), newCameraUrl.trim());
-      setNewCameraName('');
-      setNewCameraUrl('');
-      setShowAddCameraModal(false);
-    }
-  };
 
-  const handleDeleteCamera = (feedId: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (activeTank) {
-      MockFirestore.deleteCameraFeed(activeTank.id, feedId);
-    }
-  };
-
-  const handleSwitchFeed = (feedId: string) => {
-    if (activeTank) {
-      MockFirestore.switchActiveFeed(activeTank.id, feedId);
-    }
-  };
 
   const formatTime = (totalSeconds: number) => {
     const mins = Math.floor(totalSeconds / 60);
@@ -799,7 +817,7 @@ export const LiveScreen: React.FC = () => {
 
       ctx.textAlign = 'right';
       ctx.fillStyle = '#E2E8F0';
-      ctx.fillText(`FISH: ${stateFish} DETECTED  |  CLARITY: ${stateClarity}/10  |  ZOOM: ${zoomLevel.toFixed(1)}x`, 620, 335);
+      ctx.fillText(`FISH: ${stateFish} DETECTED  |  FNU: ${stateClarity.toFixed(2)}  |  ZOOM: ${zoomLevel.toFixed(1)}x`, 620, 335);
 
       const imgUrl = canvas.toDataURL('image/png');
       const newSnapshot = {
@@ -862,7 +880,7 @@ Recording ID: ${rec.id}
 Timestamp: ${rec.timestamp}
 Duration: ${rec.duration} seconds
 Species Count: ${rec.fishCount} detected
-Clarity Rating: ${rec.clarity} / 10
+FNU: ${rec.clarity.toFixed(2)}
 Diagnostics:
   - RTSP Stream link verified.
   - Video stream encoded at 30 FPS.
@@ -890,57 +908,6 @@ Diagnostics:
           <h1 className="canvas-title" style={{ marginTop: '2px' }}>Live Video Stream</h1>
         </div>
 
-        {/* View Mode Toggle */}
-        {isStreaming && (
-          <div style={{
-            display: 'flex',
-            background: 'var(--color-border)',
-            padding: '2px',
-            borderRadius: '10px',
-            gap: '2px'
-          }}>
-            <button
-              onClick={() => setIsGridView(false)}
-              className="secondary-button"
-              style={{
-                padding: '6px 12px',
-                fontSize: '12px',
-                border: 'none',
-                borderRadius: '8px',
-                background: !isGridView ? 'var(--color-surface)' : 'transparent',
-                color: !isGridView ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
-                fontWeight: 600,
-                boxShadow: !isGridView ? '0 1px 3px rgba(0,0,0,0.05)' : 'none',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-                cursor: 'pointer'
-              }}
-            >
-              <Video size={14} /> Single View
-            </button>
-            <button
-              onClick={() => setIsGridView(true)}
-              className="secondary-button"
-              style={{
-                padding: '6px 12px',
-                fontSize: '12px',
-                border: 'none',
-                borderRadius: '8px',
-                background: isGridView ? 'var(--color-surface)' : 'transparent',
-                color: isGridView ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
-                fontWeight: 600,
-                boxShadow: isGridView ? '0 1px 3px rgba(0,0,0,0.05)' : 'none',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-                cursor: 'pointer'
-              }}
-            >
-              <LayoutGrid size={14} /> Grid View
-            </button>
-          </div>
-        )}
       </div>
 
       {/* No Tank Linked Banner */}
@@ -963,211 +930,7 @@ Diagnostics:
         </div>
       )}
 
-      {/* Camera Selector Tabs Bar */}
-      {isStreaming && (
-        <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: '16px',
-          gap: '16px',
-          overflowX: 'auto',
-          paddingBottom: '4px'
-        }}>
-          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-            {feeds.map(feed => (
-              <div
-                key={feed.id}
-                onClick={() => !isGridView && handleSwitchFeed(feed.id)}
-                style={{
-                  padding: '8px 16px',
-                  borderRadius: '20px',
-                  border: '1px solid var(--color-border)',
-                  background: isGridView
-                    ? 'rgba(0, 0, 0, 0.02)'
-                    : (feed.id === activeFeed.id ? 'var(--color-primary-light)' : 'var(--color-surface)'),
-                  color: isGridView
-                    ? 'var(--color-text-secondary)'
-                    : (feed.id === activeFeed.id ? 'var(--color-primary-dark)' : 'var(--color-text-primary)'),
-                  fontSize: '13px',
-                  fontWeight: 600,
-                  cursor: isGridView ? 'not-allowed' : 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  transition: 'var(--transition-smooth)'
-                }}
-              >
-                <span style={{
-                  width: '6px',
-                  height: '6px',
-                  borderRadius: '50%',
-                  backgroundColor: feed.is_live ? 'var(--color-good)' : 'var(--color-text-secondary)'
-                }} />
-                <span>{feed.name}</span>
-                {feeds.length > 1 && (
-                  <button
-                    onClick={(e) => handleDeleteCamera(feed.id, e)}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      color: 'var(--color-text-secondary)',
-                      cursor: 'pointer',
-                      fontSize: '12px',
-                      padding: '2px',
-                      display: 'flex',
-                      alignItems: 'center'
-                    }}
-                    title="Delete camera feed"
-                  >
-                    ×
-                  </button>
-                )}
-              </div>
-            ))}
-
-            <button
-              onClick={() => setShowAddCameraModal(true)}
-              className="secondary-button"
-              style={{
-                padding: '6px 12px',
-                fontSize: '12px',
-                borderRadius: '20px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-                borderColor: 'var(--color-primary)'
-              }}
-            >
-              <Plus size={14} style={{ color: 'var(--color-primary)' }} />
-              <span style={{ color: 'var(--color-primary-dark)' }}>Add Camera</span>
-            </button>
-          </div>
-
-          {isGridView && (
-            <span style={{ fontSize: '12px', color: 'var(--color-text-secondary)', fontWeight: 600 }}>
-              💡 Click any camera in grid to view fullscreen
-            </span>
-          )}
-        </div>
-      )}
-
-      {/* Viewport Grid vs Single */}
-      {isGridView && isStreaming ? (
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
-          gap: '20px',
-          marginBottom: '24px'
-        }}>
-          {feeds.map(feed => (
-            <div
-              key={feed.id}
-              onClick={() => {
-                handleSwitchFeed(feed.id);
-                setIsGridView(false);
-              }}
-              className="live-camera-feed"
-              style={{
-                aspectRatio: '1 / 1',
-                cursor: 'pointer',
-                border: feed.id === activeFeed.id ? '2px solid var(--color-primary)' : '1px solid var(--color-border)',
-                transition: 'var(--transition-smooth)',
-                position: 'relative',
-                width: '100%'
-              }}
-            >
-              {/* Shutter flash overlay */}
-              <div className={`camera-flash-overlay ${flashActive && feed.id === activeFeed.id ? 'flash-active' : ''}`} />
-
-              {/* Live Camera Grid Lines */}
-              <div className="camera-grid" />
-
-              {/* Aquatic Render */}
-              <div style={{
-                width: '100%',
-                height: '100%',
-                backgroundImage: feed.mock_image ? `url(${feed.mock_image})` : 'var(--camera-placeholder)',
-                backgroundSize: 'cover',
-                backgroundPosition: 'center',
-                position: 'absolute',
-                overflow: 'hidden',
-                filter: feed.id === activeFeed.id ? `contrast(${filters.contrast}%) brightness(${filters.brightness}%) saturate(${filters.saturation}%)` : 'none'
-              }}>
-                {/* Temperature Overlay in Grid View */}
-                {feed.id === activeFeed.id && filters.temperature !== 0 && (
-                  <div style={{
-                    position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    width: '100%',
-                    height: '100%',
-                    backgroundColor: filters.temperature > 0 ? '#ffb000' : '#00a0ff',
-                    opacity: Math.abs(filters.temperature) / 300,
-                    mixBlendMode: 'color',
-                    pointerEvents: 'none',
-                    zIndex: 4
-                  }} />
-                )}
-
-                {/* Tint Overlay in Grid View */}
-                {feed.id === activeFeed.id && filters.tint !== 0 && (
-                  <div style={{
-                    position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    width: '100%',
-                    height: '100%',
-                    backgroundColor: filters.tint > 0 ? '#ff00bb' : '#00ff44',
-                    opacity: Math.abs(filters.tint) / 400,
-                    mixBlendMode: 'color',
-                    pointerEvents: 'none',
-                    zIndex: 5
-                  }} />
-                )}
-                <div style={{ position: 'absolute', top: '10%', left: '10%', fontSize: '32px', opacity: 0.2 }}>🌿</div>
-                <div style={{ position: 'absolute', bottom: '15%', right: '12%', fontSize: '42px', opacity: 0.25 }}>🍀</div>
-
-                {/* Water Calibration Line in Grid View */}
-                {(feed.calibration || activeTank?.calibration) && (
-                  <div style={{
-                    position: 'absolute',
-                    top: `${Math.min(100, Math.max(0, ((feed.calibration?.water_line_y || activeTank?.calibration?.water_line_y || 120) / 240) * 100))}%`,
-                    left: 0,
-                    width: '100%',
-                    height: '1px',
-                    borderTop: '1px dashed rgba(255,255,255,0.35)',
-                    zIndex: 10
-                  }} />
-                )}
-              </div>
-
-              {/* Badge Overlays */}
-              <div className="live-overlay-pill" style={{ left: '8px', top: '8px', padding: '4px 8px', fontSize: '10px' }}>
-                <div className="live-badge" />
-                <span>{feed.name}</span>
-              </div>
-
-              <div style={{
-                position: 'absolute',
-                bottom: '8px',
-                left: '8px',
-                display: 'flex',
-                gap: '8px',
-                zIndex: 10
-              }}>
-                <div style={{ background: 'rgba(15, 23, 42, 0.85)', padding: '4px 8px', borderRadius: '8px', fontSize: '10px', color: '#FFF' }}>
-                  <strong>{feed.current_fish_count} fish</strong>
-                </div>
-                <div style={{ background: 'rgba(15, 23, 42, 0.85)', padding: '4px 8px', borderRadius: '8px', fontSize: '10px', color: '#FFF' }}>
-                  <strong style={{ color: 'var(--color-info)' }}>{feed.current_clarity} score</strong>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      ) : (
-        /* Simulated Video Frame */
+      {/* Simulated Video Frame */}
         <div
           ref={viewportRef}
           className="live-camera-feed"
@@ -1199,17 +962,22 @@ Diagnostics:
               {/* Simulated Live Stream Feed - Aquatic Render */}
               <div ref={imageContainerRef} style={{
                 width: '100%',
-                height: '100%',
-                backgroundImage: activeFeed.mock_image ? `url(${activeFeed.mock_image})` : 'var(--camera-placeholder)',
-                backgroundSize: 'cover',
-                backgroundPosition: 'center',
-                position: 'absolute',
+                position: 'relative',
                 overflow: 'hidden',
                 transform: `translate(${panOffset.x}px, ${panOffset.y}px) scale(${zoomLevel})`,
                 transformOrigin: 'center',
-                transition: isDragging ? 'none' : 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                filter: `contrast(${filters.contrast}%) brightness(${filters.brightness}%) saturate(${filters.saturation}%)`
+                transition: isDragging ? 'none' : 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
               }}>
+                <img
+                  src={activeFeed.mock_image || ''}
+                  alt="Live feed"
+                  style={{
+                    width: '100%',
+                    height: 'auto',
+                    display: 'block',
+                    filter: `contrast(${filters.contrast}%) brightness(${filters.brightness}%) saturate(${filters.saturation}%)`
+                  }}
+                />
                 {/* Temperature Overlay */}
                 {filters.temperature !== 0 && (
                   <div style={{
@@ -1478,6 +1246,35 @@ Diagnostics:
                   {isRecording ? <Square size={14} /> : <Video size={16} />}
                 </button>
 
+                {/* Measure Clarity Button */}
+                <button
+                  className={`camera-control-btn ${lastTurbidityResult ? 'turbidity-active' : ''}`}
+                  onClick={measureTurbidity}
+                  disabled={turbidityLoading || !backendAvailable}
+                  title={
+                    !backendAvailable
+                      ? 'AI Backend Offline'
+                      : lastTurbidityResult
+                        ? `FNU: ${lastTurbidityResult.turbidity.fnu.toFixed(2)}`
+                        : 'Measure Water Clarity'
+                  }
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: lastTurbidityResult
+                      ? 'var(--color-info)'
+                      : backendAvailable
+                        ? 'rgba(15, 23, 42, 0.75)'
+                        : 'rgba(100, 100, 100, 0.5)',
+                    borderColor: lastTurbidityResult ? 'var(--color-info-light)' : 'rgba(255, 255, 255, 0.2)',
+                    color: lastTurbidityResult ? '#FFF' : backendAvailable ? '#FFF' : '#AAA',
+                    cursor: turbidityLoading || !backendAvailable ? 'not-allowed' : 'pointer'
+                  }}
+                >
+                  {turbidityLoading ? <Loader2 size={16} className="anim-spin" /> : <Eye size={16} />}
+                </button>
+
                 {/* AI Analysis Toggle */}
                 <button
                   className={`camera-control-btn ${isAIActive ? 'ai-active' : ''}`}
@@ -1707,8 +1504,8 @@ Diagnostics:
                 </div>
 
                 <div style={{ background: 'rgba(15, 23, 42, 0.75)', padding: '6px 12px', borderRadius: '12px', fontSize: '11px', color: '#FFF' }}>
-                  <span style={{ color: 'var(--color-text-secondary)', display: 'block' }}>CLARITY</span>
-                  <strong style={{ fontSize: '14px', color: 'var(--color-info)' }}>{stateClarity} / 10</strong>
+                  <span style={{ color: 'var(--color-text-secondary)', display: 'block' }}>FNU</span>
+                  <strong style={{ fontSize: '14px', color: 'var(--color-info)' }}>{stateClarity.toFixed(2)}</strong>
                 </div>
               </div>
             </>
@@ -1724,10 +1521,9 @@ Diagnostics:
             </div>
           )}
         </div>
-      )}
 
       {/* Stream Image Adjustments Card */}
-      {isStreaming && !isGridView && (
+      {isStreaming && (
         <div className="card-decoration" style={{
           padding: isAdjustmentsExpanded ? '24px' : '16px 24px',
           marginBottom: '24px',
@@ -2032,104 +1828,6 @@ Diagnostics:
         </div>
       )}
 
-      {/* Add Camera Modal Dialog */}
-      {showAddCameraModal && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          width: '100%',
-          height: '100%',
-          backgroundColor: 'rgba(15, 23, 42, 0.6)',
-          backdropFilter: 'blur(4px)',
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          zIndex: 1000
-        }}>
-          <form
-            onSubmit={handleAddCamera}
-            className="card-decoration"
-            style={{
-              padding: '24px',
-              width: '400px',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '16px',
-              boxShadow: '0 20px 25px -5px rgba(0,0,0,0.15)'
-            }}
-          >
-            <h3 style={{ fontSize: '16px', fontWeight: 700, margin: 0, color: 'var(--color-text-primary)' }}>Add New Camera Feed</h3>
-
-            <div>
-              <label style={{ display: 'block', fontSize: '11px', color: 'var(--color-text-secondary)', marginBottom: '4px', fontWeight: 600 }}>CAMERA NAME</label>
-              <input
-                type="text"
-                placeholder="e.g. Filter View"
-                value={newCameraName}
-                onChange={e => setNewCameraName(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '8px 12px',
-                  borderRadius: '10px',
-                  border: '1px solid var(--color-border)',
-                  outline: 'none',
-                  fontFamily: 'var(--font-main)',
-                  fontSize: '13px',
-                  backgroundColor: 'var(--color-surface)',
-                  color: 'var(--color-text-primary)'
-                }}
-                required
-              />
-            </div>
-
-            <div>
-              <label style={{ display: 'block', fontSize: '11px', color: 'var(--color-text-secondary)', marginBottom: '4px', fontWeight: 600 }}>RTSP STREAM URL</label>
-              <input
-                type="text"
-                placeholder="rtsp://oceaneyes.iot/..."
-                value={newCameraUrl}
-                onChange={e => setNewCameraUrl(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '8px 12px',
-                  borderRadius: '10px',
-                  border: '1px solid var(--color-border)',
-                  outline: 'none',
-                  fontFamily: 'var(--font-main)',
-                  fontSize: '13px',
-                  backgroundColor: 'var(--color-surface)',
-                  color: 'var(--color-text-primary)'
-                }}
-                required
-              />
-            </div>
-
-            <div style={{ display: 'flex', gap: '10px', marginTop: '8px' }}>
-              <button
-                type="button"
-                className="secondary-button"
-                style={{ flex: 1, padding: '10px', fontSize: '13px', borderRadius: '10px' }}
-                onClick={() => {
-                  setShowAddCameraModal(false);
-                  setNewCameraName('');
-                  setNewCameraUrl('');
-                }}
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="primary-button"
-                style={{ flex: 1, padding: '10px', fontSize: '13px', borderRadius: '10px' }}
-              >
-                Add Camera
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
-
       {isStreaming && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           <button className="secondary-button" style={{ color: 'var(--color-critical)', borderColor: 'rgba(239, 68, 68, 0.2)' }} onClick={stopStream}>
@@ -2267,30 +1965,32 @@ Diagnostics:
               </strong>
             </div>
 
-            <div style={{
-              background: 'var(--color-background)',
-              padding: '12px',
-              borderRadius: '12px',
-              border: '1px solid var(--color-border)'
-            }}>
-              <span style={{
-                fontSize: '10px',
-                color: 'var(--color-text-secondary)',
-                fontWeight: 600,
-                textTransform: 'uppercase',
-                display: 'block'
+            {lastTurbidityResult && (
+              <div style={{
+                background: 'var(--color-background)',
+                padding: '12px',
+                borderRadius: '12px',
+                border: '1px solid var(--color-border)'
               }}>
-                Clarity Score
-              </span>
-              <strong style={{
-                fontSize: '22px',
-                color: 'var(--color-info)',
-                display: 'block',
-                marginTop: '4px'
-              }}>
-                {Math.max(0, Math.min(10, (10 - lastPrediction.turbidity.fnu / 5))).toFixed(1)}/10
-              </strong>
-            </div>
+                <span style={{
+                  fontSize: '10px',
+                  color: 'var(--color-text-secondary)',
+                  fontWeight: 600,
+                  textTransform: 'uppercase',
+                  display: 'block'
+                }}>
+                  FNU
+                </span>
+                <strong style={{
+                  fontSize: '22px',
+                  color: 'var(--color-info)',
+                  display: 'block',
+                  marginTop: '4px'
+                }}>
+                  {lastTurbidityResult.turbidity.fnu.toFixed(2)}
+                </strong>
+              </div>
+            )}
 
             <div style={{
               background: 'var(--color-background)',
@@ -2305,15 +2005,15 @@ Diagnostics:
                 textTransform: 'uppercase',
                 display: 'block'
               }}>
-                Turbidity (FNU)
+                Species Found
               </span>
               <strong style={{
                 fontSize: '22px',
-                color: 'var(--color-warning)',
+                color: 'var(--color-good)',
                 display: 'block',
                 marginTop: '4px'
               }}>
-                {lastPrediction.turbidity.fnu.toFixed(2)}
+                {Object.keys(lastPrediction.summary.species_counts).length}
               </strong>
             </div>
 
@@ -2423,7 +2123,7 @@ Diagnostics:
                           {snap.fishCount} Fish Detected
                         </strong>
                         <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)', display: 'block' }}>
-                          Clarity score: {snap.clarity}/10
+                          FNU: {snap.clarity.toFixed(2)}
                         </span>
                       </div>
                       <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
@@ -2471,7 +2171,7 @@ Diagnostics:
                         Duration: {formatTime(rec.duration)}
                       </strong>
                       <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>
-                        {rec.fishCount} fish | Clarity: {rec.clarity}/10
+                        {rec.fishCount} fish | FNU: {rec.clarity.toFixed(2)}
                       </span>
                     </div>
                     <div style={{ display: 'flex', gap: '6px' }}>

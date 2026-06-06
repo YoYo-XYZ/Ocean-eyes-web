@@ -14,14 +14,14 @@ export const ActiveMonitoringScreen: React.FC<ScreenProps> = ({ onNavigate }) =>
   const [simFishHiding, setSimFishHiding] = useState(false);
 
   const latestReading = readings[0] || {
-    clarity: 7.8,
+    clarity: 1.2,
     fish_count: 10,
     ph: 7.2,
     temp: 26.1
   };
 
   // Modulate local metrics scan trigger with simulations
-  const displayClarity = simClarityIssue ? 5.2 : latestReading.clarity;
+  const displayClarity = simClarityIssue ? 8.5 : latestReading.clarity;
   const totalFish = fishList.reduce((sum, f) => sum + f.count, 0);
   const displayFish = simFishHiding ? Math.round(totalFish * 0.4) : latestReading.fish_count;
 
@@ -48,11 +48,11 @@ export const ActiveMonitoringScreen: React.FC<ScreenProps> = ({ onNavigate }) =>
         newAlerts.unshift({
           id: `alert-c-${Date.now()}`,
           title: 'Water clarity dropped',
-          message: `Water clarity fell to ${displayClarity} (Threshold: ${activeTank.thresholds.clarity_min}). Check filter unit.`,
+          message: `Water turbidity rose to ${displayClarity} FNU (Threshold: ${activeTank.thresholds.clarity_min}). Check filter unit.`,
           tip: 'A sudden clarity drop indicates a clogged filter sponge or disturbed substrate. Wash the filter media or perform a 20% water change.',
           severity: 'warning',
           timeAgo: 'Just now',
-          clarityBefore: '8.2',
+          clarityBefore: '2.5',
           clarityAfter: displayClarity.toString(),
           fishBefore: totalFish.toString(),
           fishAfter: displayFish.toString(),
@@ -254,7 +254,7 @@ export const ActiveMonitoringScreen: React.FC<ScreenProps> = ({ onNavigate }) =>
 
         <div style={{ background: '#0F172A', padding: '10px', borderRadius: '8px', border: '1px solid #1E293B' }}>
           <span style={{ fontSize: '10px', color: '#64748B', display: 'block' }}>WATER CLARITY</span>
-          <strong style={{ fontSize: '16px', color: '#38BDF8' }}>{displayClarity}/10 score</strong>
+          <strong style={{ fontSize: '16px', color: '#38BDF8' }}>{displayClarity.toFixed(2)} FNU</strong>
         </div>
       </div>
 

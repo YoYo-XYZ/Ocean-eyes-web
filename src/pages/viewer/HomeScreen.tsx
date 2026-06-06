@@ -61,7 +61,7 @@ export const HomeScreen: React.FC = () => {
   };
 
   const latestReading = readings[0] || {
-    clarity: 7.8,
+    clarity: 1.2,
     fish_count: 10,
     ph: 7.2,
     temp: 26.1,
@@ -76,7 +76,7 @@ export const HomeScreen: React.FC = () => {
     stream_url: 'rtsp://oceaneyes.iot/live-stream-09',
     is_live: false,
     started_at: null,
-    current_clarity: 7.8,
+    current_clarity: 1.2,
     current_fish_count: 10,
     mock_image: '/mock_camera_main.png'
   };
@@ -87,21 +87,21 @@ export const HomeScreen: React.FC = () => {
   // Start stream helper
   const startStream = () => {
     if (activeTank && liveState) {
-      const updatedFeeds = liveState.feeds.map(f => ({
-        ...f,
+      const feed = liveState.feeds[0];
+      const updatedFeed = {
+        ...feed,
         is_live: true,
-        started_at: f.started_at || new Date().toISOString()
-      }));
-      const active = updatedFeeds.find(f => f.id === liveState.selected_feed_id) || updatedFeeds[0];
+        started_at: feed.started_at || new Date().toISOString()
+      };
       MockFirestore.saveLiveState(activeTank.id, {
         ...liveState,
         is_live: true,
-        stream_url: active.stream_url,
-        started_at: active.started_at || new Date().toISOString(),
+        stream_url: updatedFeed.stream_url,
+        started_at: updatedFeed.started_at,
         last_ping_at: new Date().toISOString(),
-        current_clarity: active.current_clarity,
-        current_fish_count: active.current_fish_count,
-        feeds: updatedFeeds
+        current_clarity: updatedFeed.current_clarity,
+        current_fish_count: updatedFeed.current_fish_count,
+        feeds: [updatedFeed]
       });
     }
   };
@@ -109,11 +109,12 @@ export const HomeScreen: React.FC = () => {
   // Stop stream helper
   const stopStream = () => {
     if (activeTank && liveState) {
-      const updatedFeeds = liveState.feeds.map(f => ({
-        ...f,
+      const feed = liveState.feeds[0];
+      const updatedFeed = {
+        ...feed,
         is_live: false,
         started_at: null
-      }));
+      };
       MockFirestore.saveLiveState(activeTank.id, {
         ...liveState,
         is_live: false,
@@ -122,14 +123,15 @@ export const HomeScreen: React.FC = () => {
         last_ping_at: null,
         current_clarity: 0,
         current_fish_count: 0,
-        feeds: updatedFeeds
+        feeds: [updatedFeed]
       });
     }
   };
 
   // Health calculation representing Dart logic: pH, clarity, ammonia, nitrite weighting
+  // With FNU, lower is better (ideal ~0.5), so we penalize values above baseline
   const healthScore = parseFloat((
-    Math.max(1, 10 - (Math.abs(7.2 - latestReading.ph) * 4) - (10 - displayClarity) * 0.4 - (latestReading.ammonia * 20) - (latestReading.nitrite * 3))
+    Math.max(1, 10 - (Math.abs(7.2 - latestReading.ph) * 4) - Math.max(0, displayClarity - 0.5) * 0.8 - (latestReading.ammonia * 20) - (latestReading.nitrite * 3))
   ).toFixed(1));
 
   // Determine health color rating
@@ -276,40 +278,12 @@ export const HomeScreen: React.FC = () => {
                   <Video size={16} style={{ color: 'var(--color-primary)' }} />
                   <span>Live Feed Monitor</span>
                 </h3>
-                
-                {feeds.length > 0 && (
-                  <select
-                    value={activeFeed.id}
-                    onChange={(e) => {
-                      if (activeTank) {
-                        MockFirestore.switchActiveFeed(activeTank.id, e.target.value);
-                      }
-                    }}
-                    style={{
-                      padding: '4px 8px',
-                      borderRadius: '8px',
-                      border: '1px solid var(--color-border)',
-                      backgroundColor: 'var(--color-dropdown-bg)',
-                      color: 'var(--color-text-primary)',
-                      fontFamily: 'var(--font-main)',
-                      fontSize: '12px',
-                      fontWeight: 600,
-                      outline: 'none',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    {feeds.map(f => (
-                      <option key={f.id} value={f.id}>{f.name}</option>
-                    ))}
-                  </select>
-                )}
               </div>
 
               {/* Viewport Frame */}
-              <div 
+              <div
                 className="live-camera-feed"
                 style={{
-                  aspectRatio: '1 / 1',
                   position: 'relative',
                   width: '100%',
                   borderRadius: '12px',
@@ -327,13 +301,22 @@ export const HomeScreen: React.FC = () => {
                     <div className="camera-grid" />
 
                     {/* Aquatic Render */}
+                    <img
+                      src={activeFeed.mock_image || ''}
+                      alt="Live feed"
+                      style={{
+                        width: '100%',
+                        height: 'auto',
+                        display: 'block'
+                      }}
+                    />
                     <div style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
                       width: '100%',
                       height: '100%',
-                      backgroundImage: activeFeed.mock_image ? `url(${activeFeed.mock_image})` : 'var(--camera-placeholder)',
-                      backgroundSize: 'cover',
-                      backgroundPosition: 'center',
-                      position: 'absolute',
+                      pointerEvents: 'none',
                       overflow: 'hidden'
                     }}>
                       <div style={{ position: 'absolute', top: '10%', left: '10%', fontSize: '24px', opacity: 0.2 }}>🌿</div>
@@ -358,7 +341,7 @@ export const HomeScreen: React.FC = () => {
                         <strong>{displayFishCount} fish</strong>
                       </div>
                       <div style={{ background: 'rgba(15, 23, 42, 0.85)', padding: '3px 6px', borderRadius: '6px', fontSize: '9px', color: '#FFF' }}>
-                        <strong style={{ color: 'var(--color-info)' }}>{displayClarity.toFixed(1)} score</strong>
+                        <strong style={{ color: 'var(--color-info)' }}>{displayClarity.toFixed(2)} FNU</strong>
                       </div>
                     </div>
                   </>
@@ -497,8 +480,8 @@ export const HomeScreen: React.FC = () => {
             <div className="card-decoration" style={{ display: 'flex', flexDirection: 'column', cursor: 'pointer' }} onClick={() => setActiveTab('history')}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
                 <div>
-                  <span style={{ fontSize: '28px', fontWeight: 800 }}>{displayClarity.toFixed(1)}</span>
-                  <span style={{ fontSize: '13px', color: 'var(--color-text-secondary)', marginLeft: '4px' }}>/10 score</span>
+                  <span style={{ fontSize: '28px', fontWeight: 800 }}>{displayClarity.toFixed(2)}</span>
+                  <span style={{ fontSize: '13px', color: 'var(--color-text-secondary)', marginLeft: '4px' }}>FNU</span>
                 </div>
                 <Droplet size={20} style={{ color: 'var(--color-info)', marginTop: '4px' }} />
               </div>
@@ -608,66 +591,7 @@ export const HomeScreen: React.FC = () => {
             </div>
           )}
 
-          {/* Connected Camera Feeds widget */}
-          {liveState && liveState.feeds && (
-            <div style={{ marginTop: '8px' }}>
-              <h3 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--color-text-primary)', marginBottom: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span>Connected Feeds ({liveState.feeds.length})</span>
-                <button 
-                  onClick={() => setActiveTab('live')}
-                  style={{ background: 'none', border: 'none', color: 'var(--color-primary)', fontSize: '12px', fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font-main)' }}
-                >
-                  Configure
-                </button>
-              </h3>
-              
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                {liveState.feeds.map(feed => (
-                  <div 
-                    key={feed.id} 
-                    className="card-decoration" 
-                    style={{ 
-                      padding: '12px 16px', 
-                      display: 'flex', 
-                      justifyContent: 'space-between', 
-                      alignItems: 'center',
-                      cursor: 'pointer',
-                      borderLeft: feed.id === liveState.selected_feed_id ? '4px solid var(--color-primary)' : '1px solid var(--color-border)',
-                      boxShadow: 'var(--shadow-card)'
-                    }}
-                    onClick={() => {
-                      if (activeTank) {
-                        MockFirestore.switchActiveFeed(activeTank.id, feed.id);
-                        setActiveTab('live');
-                      }
-                    }}
-                  >
-                    <div>
-                      <strong style={{ fontSize: '14px', color: 'var(--color-text-primary)' }}>{feed.name}</strong>
-                      <span style={{ display: 'block', fontSize: '11px', color: 'var(--color-text-secondary)', marginTop: '2px' }}>
-                        {feed.stream_url}
-                      </span>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      {liveState.is_live ? (
-                        <>
-                          <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-secondary)' }}>
-                            🐟 {feed.current_fish_count} · 💧 {feed.current_clarity}
-                          </span>
-                          <span className="live-badge" style={{ animation: 'pulse 1.5s infinite', margin: 0 }} />
-                        </>
-                      ) : (
-                        <>
-                          <span style={{ fontSize: '10px', color: 'var(--color-text-secondary)' }}>Offline</span>
-                          <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: 'var(--color-text-secondary)' }} />
-                        </>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+
         </div>
       </div>
 

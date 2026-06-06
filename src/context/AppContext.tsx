@@ -188,7 +188,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (!tankId) return;
 
     // Generate simulated stats
-    const currentClarity = parseFloat((7.0 + Math.random() * 2.0).toFixed(1));
+    const currentClarity = parseFloat((0.5 + Math.random() * 4.5).toFixed(2));
     const randomFishOffset = Math.random() > 0.7 ? (Math.random() > 0.5 ? 1 : -1) : 0;
     
     // Sum standard counts
@@ -220,8 +220,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     // Check thresholds to generate alerts
     if (activeTank) {
-      const minClarity = activeTank.thresholds.clarity_min;
-      if (currentClarity < minClarity) {
+      const maxFnu = activeTank.thresholds.clarity_min;
+      if (currentClarity > maxFnu) {
         // Clarity Alert
         const activeAlerts = MockFirestore.getAlerts();
         const existing = activeAlerts.find(a => !a.resolved && a.title.includes('clarity'));
@@ -230,11 +230,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           newAlerts.unshift({
             id: `alert-c-${Date.now()}`,
             title: 'Water clarity dropped',
-            message: `Water clarity fell to ${currentClarity} (Threshold: ${minClarity}). Check your filter unit.`,
+            message: `Water turbidity rose to ${currentClarity} FNU (Threshold: ${maxFnu}). Check your filter unit.`,
             tip: 'Your filters might require a quick scrub. Consider running a partial water cycle swap or verifying the intake system.',
             severity: 'warning',
             timeAgo: 'Just now',
-            clarityBefore: '8.2',
+            clarityBefore: '2.5',
             clarityAfter: currentClarity.toString(),
             fishBefore: totalExpectedFish.toString(),
             fishAfter: simulatedDetected.toString(),
@@ -282,36 +282,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       // Simulate live streaming ping
       const currentStreamState = MockFirestore.getLiveState(tankId);
       if (currentStreamState.is_live) {
-        // Modulate live stats for all camera feeds
-        const updatedFeeds = currentStreamState.feeds.map(feed => {
-          const clarityOffset = (Math.random() - 0.5) * 0.4;
-          const currentClarity = parseFloat((feed.current_clarity + clarityOffset).toFixed(1));
-          
-          const totalExpectedFish = fishList.reduce((sum, f) => sum + f.count, 0);
-          const randomFishOffset = Math.random() > 0.85 ? -1 : (Math.random() > 0.9 ? 1 : 0);
-          const simulatedDetected = Math.max(0, totalExpectedFish + randomFishOffset);
-          
-          return {
-            ...feed,
-            is_live: true,
-            started_at: feed.started_at || new Date().toISOString(),
-            current_clarity: Math.max(1.0, Math.min(10.0, currentClarity)),
-            current_fish_count: simulatedDetected
-          };
-        });
+        // Modulate live stats for the single camera feed
+        const feed = currentStreamState.feeds[0];
 
-        // Find the active feed and update top-level stats
-        const activeFeed = updatedFeeds.find(f => f.id === currentStreamState.selected_feed_id) || updatedFeeds[0];
+        const totalExpectedFish = fishList.reduce((sum, f) => sum + f.count, 0);
+        const randomFishOffset = Math.random() > 0.85 ? -1 : (Math.random() > 0.9 ? 1 : 0);
+        const simulatedDetected = Math.max(0, totalExpectedFish + randomFishOffset);
+
+        const updatedFeed = {
+          ...feed,
+          is_live: true,
+          started_at: feed.started_at || new Date().toISOString(),
+          current_fish_count: simulatedDetected
+        };
 
         MockFirestore.saveLiveState(tankId, {
           is_live: true,
-          stream_url: activeFeed.stream_url,
-          started_at: activeFeed.started_at,
+          stream_url: updatedFeed.stream_url,
+          started_at: updatedFeed.started_at,
           last_ping_at: new Date().toISOString(),
-          current_clarity: activeFeed.current_clarity,
-          current_fish_count: activeFeed.current_fish_count,
+          current_clarity: updatedFeed.current_clarity,
+          current_fish_count: updatedFeed.current_fish_count,
           selected_feed_id: currentStreamState.selected_feed_id,
-          feeds: updatedFeeds
+          feeds: [updatedFeed]
         });
       }
 
