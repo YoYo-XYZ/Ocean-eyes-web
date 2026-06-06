@@ -31,8 +31,8 @@ const OceanEyesDashboard: React.FC = () => {
       <aside className="sidebar">
         <div className="sidebar-header">
           <div className="sidebar-logo">
-            <span>🌊</span>
-            <span style={{ fontFamily: 'var(--font-main)', letterSpacing: '-0.03em' }}>OceanEyes</span>
+            <img src="/logo.png" alt="" style={{ height: 36, width: 'auto', display: 'block' }} />
+            <span className="sidebar-logo-text" style={{ fontFamily: 'var(--font-main)', letterSpacing: '-0.03em' }}>OceanEyes</span>
           </div>
         </div>
 
@@ -147,7 +147,7 @@ const OceanEyesDashboard: React.FC = () => {
       {/* ─── Main Content Canvas ─── */}
       <main className="main-canvas">
         {/* Under onboarding check */}
-        {tankId === null && activeTab !== 'monitor' ? (
+        {tankId === null && activeTab !== 'monitor' && activeTab !== 'live' ? (
           <div className="card-decoration" style={{ maxWidth: '480px', margin: '40px auto 0 auto', padding: '40px' }}>
             <ViewerApp />
           </div>

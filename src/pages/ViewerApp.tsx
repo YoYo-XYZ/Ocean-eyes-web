@@ -10,11 +10,11 @@ import { HistoryDetailScreen } from './viewer/HistoryDetailScreen';
 import { MyFishScreen } from './viewer/MyFishScreen';
 
 export const ViewerApp: React.FC = () => {
-  const { tankId } = useApp();
+  const { tankId, activeTab } = useApp();
 
   return (
     <div className="scaffold">
-      {tankId === null ? <RootGateOnboarding /> : <ViewerShell />}
+      {tankId === null && activeTab !== 'live' ? <RootGateOnboarding /> : <ViewerShell />}
     </div>
   );
 };

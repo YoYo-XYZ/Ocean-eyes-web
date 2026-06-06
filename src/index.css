@@ -105,6 +105,13 @@ h1, h2, h3, h4, h5, h6 {
   width: 100%;
 }
 
+.scaffold {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
 @media (max-width: 900px) {
   .dashboard-wrapper {
     flex-direction: column;
@@ -142,12 +149,15 @@ h1, h2, h3, h4, h5, h6 {
 .sidebar-logo {
   font-size: 26px;
   font-weight: 800;
-  background: var(--logo-gradient);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.sidebar-logo-text {
+  background: var(--logo-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
 .sidebar-tag {
@@ -389,7 +399,7 @@ h1, h2, h3, h4, h5, h6 {
   overflow: hidden;
   background-color: var(--color-camera-bg);
   border-radius: 20px;
-  aspect-ratio: 21 / 9;
+  aspect-ratio: 1 / 1;
   border: 1px solid var(--color-camera-border);
   box-shadow: var(--shadow-premium);
 }
@@ -407,7 +417,7 @@ h1, h2, h3, h4, h5, h6 {
 
 @media (max-width: 768px) {
   .live-camera-feed {
-    aspect-ratio: 16 / 9;
+    aspect-ratio: 1 / 1;
   }
 }
 
@@ -471,6 +481,15 @@ h1, h2, h3, h4, h5, h6 {
   0% { opacity: 0.4; }
   50% { opacity: 1; }
   100% { opacity: 0.4; }
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.anim-spin {
+  animation: spin 1s linear infinite;
 }
 
 /* Draggable Water Level Container */
@@ -579,10 +598,22 @@ h1, h2, h3, h4, h5, h6 {
   animation: pulse-recording-border 1.5s infinite;
 }
 
+.camera-control-btn.ai-active {
+  background: var(--color-primary);
+  border-color: var(--color-primary-light);
+  animation: pulse-ai-border 2s infinite;
+}
+
 @keyframes pulse-recording-border {
   0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.5); }
   70% { box-shadow: 0 0 0 8px rgba(239, 68, 68, 0); }
   100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+}
+
+@keyframes pulse-ai-border {
+  0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.5); }
+  70% { box-shadow: 0 0 0 8px rgba(59, 130, 246, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
 }
 
 .camera-gallery-grid {

@@ -100,3 +100,41 @@ export interface FilterPreset {
   isCustom: boolean;
   filters: CameraFilters;
 }
+
+// ─── AI Inference Types ─────────────────────────────────────────────────────
+
+export interface AIDetection {
+  bbox: [number, number, number, number];
+  bbox_normalized: [number, number, number, number];
+  detection_confidence: number;
+  species: string;
+  species_display: string;
+  confidence: number;
+  below_threshold: boolean;
+  threshold: number;
+}
+
+export interface AITurbidity {
+  fnu: number;
+  top_class: string;
+  top_confidence: number;
+  all_probabilities: Record<string, number>;
+}
+
+export interface AISummary {
+  total_detections: number;
+  species_counts: Record<string, number>;
+}
+
+export interface AIPredictionResult {
+  timestamp: string;
+  image_dimensions: { width: number; height: number };
+  models: {
+    detection: { provider: string };
+    species: { provider: string };
+    turbidity: { provider: string };
+  };
+  turbidity: AITurbidity;
+  detections: AIDetection[];
+  summary: AISummary;
+}

@@ -1,8 +1,8 @@
 /* eslint-disable react-hooks/set-state-in-effect */
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useApp } from '../../context/AppContext';
 import { MockFirestore } from '../../services/mock_service';
-import type { CameraFilters, FilterPreset } from '../../types/aquarium';
+import type { CameraFilters, FilterPreset, AIPredictionResult } from '../../types/aquarium';
 import {
   Video,
   LayoutGrid,
@@ -19,9 +19,12 @@ import {
   Maximize,
   Minimize,
   Fish,
-  Eye
+  Eye,
+  Brain,
+  Loader2
 } from 'lucide-react';
 import { getSpeciesById, getSpeciesColor, getSpeciesInitials } from '../../data/speciesCatalog';
+import { isBackendAvailable, captureFrameFromUrl, sendFrameForInference } from '../../services/ai_service';
 
 const DEFAULT_PRESETS: FilterPreset[] = [
   {
@@ -49,6 +52,41 @@ const DEFAULT_PRESETS: FilterPreset[] = [
     filters: { contrast: 85, brightness: 105, saturation: 0, temperature: 0, tint: 0 }
   }
 ];
+
+/**
+ * Calculate the visible region of an image rendered with object-fit: cover
+ * or background-size: cover within a container.
+ */
+function getCoverOffsets(
+  imgWidth: number,
+  imgHeight: number,
+  containerWidth: number,
+  containerHeight: number
+) {
+  const imgRatio = imgWidth / imgHeight;
+  const containerRatio = containerWidth / containerHeight;
+
+  let renderedWidth: number;
+  let renderedHeight: number;
+  let offsetX: number;
+  let offsetY: number;
+
+  if (containerRatio > imgRatio) {
+    // Container is wider: image fills width, height is cropped
+    renderedWidth = containerWidth;
+    renderedHeight = containerWidth / imgRatio;
+    offsetX = 0;
+    offsetY = (containerHeight - renderedHeight) / 2;
+  } else {
+    // Container is taller: image fills height, width is cropped
+    renderedHeight = containerHeight;
+    renderedWidth = containerHeight * imgRatio;
+    offsetX = (containerWidth - renderedWidth) / 2;
+    offsetY = 0;
+  }
+
+  return { renderedWidth, renderedHeight, offsetX, offsetY };
+}
 
 const FishThumbnail: React.FC<{ imagePath?: string; initials: string; color: string }> = ({ imagePath, initials, color }) => {
   const [hasError, setHasError] = useState(false);
@@ -103,6 +141,7 @@ export const LiveScreen: React.FC = () => {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showFsInventory, setShowFsInventory] = useState(false);
   const viewportRef = useRef<HTMLDivElement | null>(null);
+  const imageContainerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     const handleFullscreenChange = () => {
@@ -133,6 +172,23 @@ export const LiveScreen: React.FC = () => {
   const [isRecording, setIsRecording] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const [flashActive, setFlashActive] = useState(false);
+
+  // ─── AI Analysis State ─────────────────────────────────────────────────────
+  const [isAIActive, setIsAIActive] = useState(false);
+  const [backendAvailable, setBackendAvailable] = useState(false);
+  const [lastPrediction, setLastPrediction] = useState<AIPredictionResult | null>(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+  const aiIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Check backend availability on mount
+  useEffect(() => {
+    isBackendAvailable().then(setBackendAvailable);
+    const interval = setInterval(() => {
+      isBackendAvailable().then(setBackendAvailable);
+    }, 10000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Water level calibration state
   const [isCalibrating, setIsCalibrating] = useState(false);
@@ -212,6 +268,25 @@ export const LiveScreen: React.FC = () => {
       setSelectedPresetId('custom');
     }
   };
+
+  // Container dimensions for accurate AI overlay positioning
+  const [containerSize, setContainerSize] = useState({ width: 640, height: 360 });
+
+  useEffect(() => {
+    const updateSize = () => {
+      if (imageContainerRef.current) {
+        const rect = imageContainerRef.current.getBoundingClientRect();
+        setContainerSize({ width: rect.width, height: rect.height });
+      }
+    };
+    updateSize();
+    window.addEventListener('resize', updateSize);
+    return () => window.removeEventListener('resize', updateSize);
+  }, []);
+
+  // Natural dimensions of the source image (needed because inference is done on a
+  // resized canvas, but the UI displays the original image with background-size: cover).
+  const [imageNaturalSize, setImageNaturalSize] = useState({ width: 0, height: 0 });
 
   // Multi-camera feeds view states
   const [isGridView, setIsGridView] = useState(false);
@@ -336,6 +411,102 @@ export const LiveScreen: React.FC = () => {
     current_clarity: 7.8,
     current_fish_count: 10
   };
+
+  // Load natural dimensions of the active feed image for accurate AI overlay positioning
+  useEffect(() => {
+    if (!activeFeed.mock_image) return;
+    const img = new Image();
+    img.onload = () => {
+      setImageNaturalSize({ width: img.naturalWidth, height: img.naturalHeight });
+    };
+    img.src = activeFeed.mock_image;
+  }, [activeFeed.mock_image]);
+
+  // AI frame capture loop
+  useEffect(() => {
+    if (!isAIActive || !isStreaming || !backendAvailable) {
+      if (aiIntervalRef.current) {
+        clearInterval(aiIntervalRef.current);
+        aiIntervalRef.current = null;
+      }
+      return;
+    }
+
+    const processFrame = async () => {
+      if (!activeFeed.mock_image || aiLoading) return;
+      setAiLoading(true);
+      setAiError(null);
+      try {
+        const blob = await captureFrameFromUrl(activeFeed.mock_image, 640, 360);
+        const result = await sendFrameForInference(blob, 0.35);
+        setLastPrediction(result);
+
+        // Update MockFirestore with real AI data
+        if (activeTank) {
+          const clarityScore = Math.max(0, Math.min(10, 10 - result.turbidity.fnu / 5));
+          const totalFish = result.summary.total_detections;
+
+          MockFirestore.writeReading({
+            tankId: activeTank.id,
+            clarity: parseFloat(clarityScore.toFixed(1)),
+            fishCount: totalFish,
+          });
+
+          // Update live state with AI results
+          const currentLive = MockFirestore.getLiveState(activeTank.id);
+          const updatedFeeds = currentLive.feeds.map(f => {
+            if (f.id === activeFeed.id) {
+              return {
+                ...f,
+                current_clarity: parseFloat(clarityScore.toFixed(1)),
+                current_fish_count: totalFish,
+              };
+            }
+            return f;
+          });
+          MockFirestore.saveLiveState(activeTank.id, {
+            ...currentLive,
+            current_clarity: parseFloat(clarityScore.toFixed(1)),
+            current_fish_count: totalFish,
+            feeds: updatedFeeds,
+          });
+
+          // Update detected counts per species
+          Object.entries(result.summary.species_counts).forEach(([speciesId, count]) => {
+            const fishEntry = fishList.find(f => f.speciesId === speciesId);
+            if (fishEntry) {
+              MockFirestore.updateDetected(fishEntry.id, count);
+            }
+          });
+        }
+      } catch (err) {
+        setAiError(err instanceof Error ? err.message : 'AI inference failed');
+      } finally {
+        setAiLoading(false);
+      }
+    };
+
+    // Run immediately, then every 3 seconds
+    processFrame();
+    aiIntervalRef.current = setInterval(processFrame, 3000);
+
+    return () => {
+      if (aiIntervalRef.current) {
+        clearInterval(aiIntervalRef.current);
+        aiIntervalRef.current = null;
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAIActive, isStreaming, backendAvailable, activeFeed.mock_image]);
+
+  const toggleAI = useCallback(() => {
+    if (!backendAvailable) {
+      alert('AI Backend is offline.\n\nPlease start it first:\ncd ai && python api_server.py');
+      return;
+    }
+    setIsAIActive(prev => !prev);
+    setAiError(null);
+  }, [backendAvailable]);
 
   // Water level calibration helpers (resolving per-camera calibration first)
   const activeFeedCalibration = activeFeed?.calibration || activeTank?.calibration;
@@ -772,6 +943,26 @@ Diagnostics:
         )}
       </div>
 
+      {/* No Tank Linked Banner */}
+      {!activeTank && (
+        <div style={{
+          background: 'var(--color-warning-bg, rgba(217, 119, 6, 0.08))',
+          border: '1px solid var(--color-warning, #D97706)',
+          borderRadius: '12px',
+          padding: '12px 16px',
+          marginBottom: '20px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '10px',
+          color: 'var(--color-warning-dark, #B45309)',
+          fontSize: '13px',
+          fontWeight: 600
+        }}>
+          <span style={{ fontSize: '16px' }}>⚠️</span>
+          <span>No aquarium linked. Link a tank from the Dashboard to save camera feeds and enable AI detection.</span>
+        </div>
+      )}
+
       {/* Camera Selector Tabs Bar */}
       {isStreaming && (
         <div style={{
@@ -878,7 +1069,7 @@ Diagnostics:
               }}
               className="live-camera-feed"
               style={{
-                aspectRatio: '16 / 9',
+                aspectRatio: '1 / 1',
                 cursor: 'pointer',
                 border: feed.id === activeFeed.id ? '2px solid var(--color-primary)' : '1px solid var(--color-border)',
                 transition: 'var(--transition-smooth)',
@@ -1006,7 +1197,7 @@ Diagnostics:
               <div className="camera-grid" />
 
               {/* Simulated Live Stream Feed - Aquatic Render */}
-              <div style={{
+              <div ref={imageContainerRef} style={{
                 width: '100%',
                 height: '100%',
                 backgroundImage: activeFeed.mock_image ? `url(${activeFeed.mock_image})` : 'var(--camera-placeholder)',
@@ -1083,6 +1274,112 @@ Diagnostics:
                   </div>
                 )}
               </div>
+
+              {/* AI Detection Bounding Boxes Overlay */}
+              {isAIActive && lastPrediction && (
+                <div style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: '100%',
+                  height: '100%',
+                  zIndex: 15,
+                  pointerEvents: 'none',
+                  transform: `translate(${panOffset.x}px, ${panOffset.y}px) scale(${zoomLevel})`,
+                  transformOrigin: 'center',
+                  transition: isDragging ? 'none' : 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+                }}>
+                  {(() => {
+                    // Calculate cover-fit offsets for accurate coordinate mapping
+                    // Use the original image's natural dimensions because the backend
+                    // normalizes bounding boxes relative to the source image, not the
+                    // inference canvas.
+                    const cw = containerSize.width;
+                    const ch = containerSize.height;
+                    const iw = imageNaturalSize.width || lastPrediction.image_dimensions.width || cw;
+                    const ih = imageNaturalSize.height || lastPrediction.image_dimensions.height || ch;
+                    const { renderedWidth, renderedHeight, offsetX, offsetY } = getCoverOffsets(iw, ih, cw, ch);
+
+                    return lastPrediction.detections.map((det, idx) => {
+                      const [nx1, ny1, nx2, ny2] = det.bbox_normalized;
+                      const speciesInfo = getSpeciesById(det.species);
+                      const boxColor = speciesInfo?.color || '#3B82F6';
+
+                      // Map normalized coords to the visible (rendered) image region
+                      const left = offsetX + nx1 * renderedWidth;
+                      const top = offsetY + ny1 * renderedHeight;
+                      const width = (nx2 - nx1) * renderedWidth;
+                      const height = (ny2 - ny1) * renderedHeight;
+
+                      return (
+                        <div key={idx} style={{
+                          position: 'absolute',
+                          left: `${left}px`,
+                          top: `${top}px`,
+                          width: `${width}px`,
+                          height: `${height}px`,
+                          border: `2px solid ${boxColor}`,
+                          borderRadius: '4px',
+                          boxShadow: `0 0 8px ${boxColor}40`
+                        }}>
+                          <div style={{
+                            position: 'absolute',
+                            top: '-22px',
+                            left: 0,
+                            backgroundColor: boxColor,
+                            color: '#FFF',
+                            fontSize: '10px',
+                            fontWeight: 700,
+                            padding: '2px 6px',
+                            borderRadius: '4px',
+                            whiteSpace: 'nowrap',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px'
+                          }}>
+                            <span>{det.species_display}</span>
+                            <span style={{ opacity: 0.8 }}>
+                              {(det.confidence * 100).toFixed(0)}%
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    });
+                  })()}
+                </div>
+              )}
+
+              {/* AI Status Overlay */}
+              {isAIActive && (
+                <div style={{
+                  position: 'absolute',
+                  top: '12px',
+                  left: '50%',
+                  transform: 'translateX(-50%)',
+                  zIndex: 16,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  background: 'rgba(15, 23, 42, 0.85)',
+                  padding: '6px 12px',
+                  borderRadius: '20px',
+                  border: `1px solid ${aiError ? 'var(--color-critical)' : 'var(--color-primary)'}`,
+                  color: '#FFF',
+                  fontSize: '11px',
+                  fontWeight: 600
+                }}>
+                  <div style={{
+                    width: '8px',
+                    height: '8px',
+                    borderRadius: '50%',
+                    backgroundColor: aiLoading ? 'var(--color-warning)' : aiError ? 'var(--color-critical)' : 'var(--color-good)',
+                    animation: aiLoading ? 'pulse 1.5s infinite' : 'none'
+                  }} />
+                  <span>
+                    {aiLoading ? 'AI Analyzing...' : aiError ? `AI Error: ${aiError}` : `AI Active · ${lastPrediction?.summary.total_detections || 0} fish detected`}
+                  </span>
+                </div>
+              )}
 
               {/* Badges overlay */}
               <div className="live-overlay-pill" style={{ left: '12px' }}>
@@ -1179,6 +1476,34 @@ Diagnostics:
                   title={isRecording ? "Stop Recording" : "Start Recording"}
                 >
                   {isRecording ? <Square size={14} /> : <Video size={16} />}
+                </button>
+
+                {/* AI Analysis Toggle */}
+                <button
+                  className={`camera-control-btn ${isAIActive ? 'ai-active' : ''}`}
+                  onClick={toggleAI}
+                  title={
+                    !backendAvailable
+                      ? 'AI Backend Offline - Click for help'
+                      : isAIActive
+                        ? 'Stop AI Analysis'
+                        : 'Start AI Analysis'
+                  }
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: isAIActive
+                      ? 'var(--color-primary)'
+                      : backendAvailable
+                        ? 'rgba(15, 23, 42, 0.75)'
+                        : 'rgba(100, 100, 100, 0.5)',
+                    borderColor: isAIActive ? 'var(--color-primary-light)' : 'rgba(255, 255, 255, 0.2)',
+                    color: isAIActive ? '#FFF' : backendAvailable ? '#FFF' : '#AAA',
+                    cursor: 'pointer'
+                  }}
+                >
+                  {aiLoading ? <Loader2 size={16} className="anim-spin" /> : <Brain size={16} />}
                 </button>
 
                 {/* Fullscreen Inventory Toggle (Only visible in Fullscreen) */}
@@ -1872,6 +2197,200 @@ Diagnostics:
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* AI Analysis Panel */}
+      {isStreaming && isAIActive && lastPrediction && (
+        <div style={{
+          marginBottom: '24px',
+          padding: '20px',
+          background: 'var(--color-surface)',
+          borderRadius: '16px',
+          border: '1px solid var(--color-border)'
+        }}>
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: '16px'
+          }}>
+            <h3 style={{
+              margin: 0,
+              fontSize: '15px',
+              fontWeight: 700,
+              color: 'var(--color-text-primary)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}>
+              <Brain size={18} color="var(--color-primary)" />
+              AI Analysis Results
+            </h3>
+            <span style={{
+              fontSize: '11px',
+              color: 'var(--color-text-secondary)',
+              fontWeight: 600
+            }}>
+              {new Date(lastPrediction.timestamp).toLocaleTimeString()}
+            </span>
+          </div>
+
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+            gap: '12px',
+            marginBottom: '16px'
+          }}>
+            <div style={{
+              background: 'var(--color-background)',
+              padding: '12px',
+              borderRadius: '12px',
+              border: '1px solid var(--color-border)'
+            }}>
+              <span style={{
+                fontSize: '10px',
+                color: 'var(--color-text-secondary)',
+                fontWeight: 600,
+                textTransform: 'uppercase',
+                display: 'block'
+              }}>
+                Fish Detected
+              </span>
+              <strong style={{
+                fontSize: '22px',
+                color: 'var(--color-primary)',
+                display: 'block',
+                marginTop: '4px'
+              }}>
+                {lastPrediction.summary.total_detections}
+              </strong>
+            </div>
+
+            <div style={{
+              background: 'var(--color-background)',
+              padding: '12px',
+              borderRadius: '12px',
+              border: '1px solid var(--color-border)'
+            }}>
+              <span style={{
+                fontSize: '10px',
+                color: 'var(--color-text-secondary)',
+                fontWeight: 600,
+                textTransform: 'uppercase',
+                display: 'block'
+              }}>
+                Clarity Score
+              </span>
+              <strong style={{
+                fontSize: '22px',
+                color: 'var(--color-info)',
+                display: 'block',
+                marginTop: '4px'
+              }}>
+                {Math.max(0, Math.min(10, (10 - lastPrediction.turbidity.fnu / 5))).toFixed(1)}/10
+              </strong>
+            </div>
+
+            <div style={{
+              background: 'var(--color-background)',
+              padding: '12px',
+              borderRadius: '12px',
+              border: '1px solid var(--color-border)'
+            }}>
+              <span style={{
+                fontSize: '10px',
+                color: 'var(--color-text-secondary)',
+                fontWeight: 600,
+                textTransform: 'uppercase',
+                display: 'block'
+              }}>
+                Turbidity (FNU)
+              </span>
+              <strong style={{
+                fontSize: '22px',
+                color: 'var(--color-warning)',
+                display: 'block',
+                marginTop: '4px'
+              }}>
+                {lastPrediction.turbidity.fnu.toFixed(2)}
+              </strong>
+            </div>
+
+            <div style={{
+              background: 'var(--color-background)',
+              padding: '12px',
+              borderRadius: '12px',
+              border: '1px solid var(--color-border)'
+            }}>
+              <span style={{
+                fontSize: '10px',
+                color: 'var(--color-text-secondary)',
+                fontWeight: 600,
+                textTransform: 'uppercase',
+                display: 'block'
+              }}>
+                Species Found
+              </span>
+              <strong style={{
+                fontSize: '22px',
+                color: 'var(--color-good)',
+                display: 'block',
+                marginTop: '4px'
+              }}>
+                {Object.keys(lastPrediction.summary.species_counts).length}
+              </strong>
+            </div>
+          </div>
+
+          {/* Species Breakdown */}
+          {Object.entries(lastPrediction.summary.species_counts).length > 0 && (
+            <div>
+              <h4 style={{
+                fontSize: '12px',
+                fontWeight: 700,
+                color: 'var(--color-text-secondary)',
+                textTransform: 'uppercase',
+                marginBottom: '10px',
+                letterSpacing: '0.05em'
+              }}>
+                Species Breakdown
+              </h4>
+              <div style={{
+                display: 'flex',
+                flexWrap: 'wrap',
+                gap: '8px'
+              }}>
+                {Object.entries(lastPrediction.summary.species_counts).map(([speciesId, count]) => {
+                  const speciesInfo = getSpeciesById(speciesId);
+                  const color = speciesInfo?.color || '#3B82F6';
+                  const displayName = speciesInfo?.displayName || speciesId.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                  return (
+                    <div key={speciesId} style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      background: 'var(--color-background)',
+                      padding: '6px 12px',
+                      borderRadius: '20px',
+                      border: `1px solid ${color}40`,
+                      fontSize: '12px',
+                      fontWeight: 600
+                    }}>
+                      <div style={{
+                        width: '8px',
+                        height: '8px',
+                        borderRadius: '50%',
+                        backgroundColor: color
+                      }} />
+                      <span style={{ color: 'var(--color-text-primary)' }}>{displayName}</span>
+                      <span style={{ color: 'var(--color-text-secondary)' }}>{count}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
