@@ -309,7 +309,7 @@ export const HomeScreen: React.FC = () => {
               <div 
                 className="live-camera-feed"
                 style={{
-                  aspectRatio: '16 / 9',
+                  aspectRatio: '1 / 1',
                   position: 'relative',
                   width: '100%',
                   borderRadius: '12px',
