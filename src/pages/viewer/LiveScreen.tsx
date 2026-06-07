@@ -81,6 +81,11 @@ export const LiveScreen: React.FC = () => {
 
   const [isCalibrating, setIsCalibrating] = useState(false);
   const [isCalibDragging, setIsCalibDragging] = useState(false);
+  const isCalibDraggingRef = useRef(false);
+  const dragLineYRef = useRef<number | null>(null);
+  const calibRectRef = useRef<DOMRect | null>(null);
+  const rafIdRef = useRef<number | null>(null);
+  const [dragLineY, setDragLineY] = useState<number | null>(null);
 
   const [filters, setFilters] = useState<CameraFilters>({
     contrast: 100,
@@ -221,6 +226,7 @@ export const LiveScreen: React.FC = () => {
     current_fish_count: 0
   };
   const activeFeedCalibration = activeFeed?.calibration || activeTank?.calibration;
+  const displayLineY = dragLineY !== null ? dragLineY : (activeFeedCalibration?.water_line_y ?? 120);
 
   useEffect(() => {
     if (!activeFeed.mock_image) return;
@@ -361,13 +367,28 @@ export const LiveScreen: React.FC = () => {
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+  const calculateWaterLineY = useCallback((rect: DOMRect, clientY: number) => {
+    const yPixel = Math.min(rect.height, Math.max(0, clientY - rect.top));
+    return Math.round((yPixel / rect.height) * 240);
+  }, []);
+
+  const scheduleDragLineUpdate = useCallback((newY: number) => {
+    dragLineYRef.current = newY;
+    if (rafIdRef.current !== null) return;
+    rafIdRef.current = requestAnimationFrame(() => {
+      rafIdRef.current = null;
+      setDragLineY(dragLineYRef.current);
+    });
+  }, []);
+
+  const handleMouseDown = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     if (isCalibrating) {
-      setIsCalibDragging(true);
       const rect = e.currentTarget.getBoundingClientRect();
-      const yPixel = Math.min(360, Math.max(0, e.clientY - rect.top));
-      const newY = Math.round((yPixel / 360) * 240);
-      updateCalibration(newY);
+      calibRectRef.current = rect;
+      isCalibDraggingRef.current = true;
+      setIsCalibDragging(true);
+      const newY = calculateWaterLineY(rect, e.clientY);
+      setDragLineY(newY);
       return;
     }
     if (zoomLevel <= 1.0) return;
@@ -376,15 +397,14 @@ export const LiveScreen: React.FC = () => {
       x: e.clientX - panOffset.x,
       y: e.clientY - panOffset.y
     });
-  };
+  }, [isCalibrating, zoomLevel, panOffset, calculateWaterLineY]);
 
-  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+  const handleMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     if (isCalibrating) {
-      if (isCalibDragging || e.buttons === 1) {
-        const rect = e.currentTarget.getBoundingClientRect();
-        const yPixel = Math.min(360, Math.max(0, e.clientY - rect.top));
-        const newY = Math.round((yPixel / 360) * 240);
-        updateCalibration(newY);
+      if (isCalibDraggingRef.current || e.buttons === 1) {
+        const rect = calibRectRef.current ?? e.currentTarget.getBoundingClientRect();
+        const newY = calculateWaterLineY(rect, e.clientY);
+        scheduleDragLineUpdate(newY);
       }
       return;
     }
@@ -401,16 +421,17 @@ export const LiveScreen: React.FC = () => {
     newY = Math.max(-limitY, Math.min(limitY, newY));
 
     setPanOffset({ x: newX, y: newY });
-  };
+  }, [isCalibrating, isDragging, zoomLevel, dragStart, calculateWaterLineY, scheduleDragLineUpdate]);
 
-  const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
+  const handleTouchStart = useCallback((e: React.TouchEvent<HTMLDivElement>) => {
     if (isCalibrating) {
-      setIsCalibDragging(true);
       const rect = e.currentTarget.getBoundingClientRect();
+      calibRectRef.current = rect;
+      isCalibDraggingRef.current = true;
+      setIsCalibDragging(true);
       const clientY = e.touches[0].clientY;
-      const yPixel = Math.min(360, Math.max(0, clientY - rect.top));
-      const newY = Math.round((yPixel / 360) * 240);
-      updateCalibration(newY);
+      const newY = calculateWaterLineY(rect, clientY);
+      setDragLineY(newY);
       return;
     }
     if (zoomLevel <= 1.0 || e.touches.length !== 1) return;
@@ -420,16 +441,15 @@ export const LiveScreen: React.FC = () => {
       x: touch.clientX - panOffset.x,
       y: touch.clientY - panOffset.y
     });
-  };
+  }, [isCalibrating, zoomLevel, panOffset, calculateWaterLineY]);
 
-  const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
+  const handleTouchMove = useCallback((e: React.TouchEvent<HTMLDivElement>) => {
     if (isCalibrating) {
-      if (isCalibDragging) {
-        const rect = e.currentTarget.getBoundingClientRect();
+      if (isCalibDraggingRef.current) {
+        const rect = calibRectRef.current ?? e.currentTarget.getBoundingClientRect();
         const clientY = e.touches[0].clientY;
-        const yPixel = Math.min(360, Math.max(0, clientY - rect.top));
-        const newY = Math.round((yPixel / 360) * 240);
-        updateCalibration(newY);
+        const newY = calculateWaterLineY(rect, clientY);
+        scheduleDragLineUpdate(newY);
       }
       return;
     }
@@ -447,12 +467,26 @@ export const LiveScreen: React.FC = () => {
     newY = Math.max(-limitY, Math.min(limitY, newY));
 
     setPanOffset({ x: newX, y: newY });
-  };
+  }, [isCalibrating, isDragging, zoomLevel, dragStart, calculateWaterLineY, scheduleDragLineUpdate]);
 
-  const handleMouseUpOrLeave = () => {
+  const handleMouseUpOrLeave = useCallback(() => {
     setIsDragging(false);
-    setIsCalibDragging(false);
-  };
+    if (isCalibDraggingRef.current) {
+      isCalibDraggingRef.current = false;
+      setIsCalibDragging(false);
+      calibRectRef.current = null;
+      if (rafIdRef.current !== null) {
+        cancelAnimationFrame(rafIdRef.current);
+        rafIdRef.current = null;
+      }
+      const finalY = dragLineYRef.current;
+      dragLineYRef.current = null;
+      if (finalY !== null) {
+        updateCalibration(finalY);
+        setDragLineY(null);
+      }
+    }
+  }, [updateCalibration]);
 
   const takeSnapshot = () => {
     if (!isStreaming) return;
@@ -744,7 +778,7 @@ Diagnostics:
             <VideoDecorations
               isCalibrating={isCalibrating}
               isCalibDragging={isCalibDragging}
-              waterLineY={activeFeedCalibration?.water_line_y ?? 120}
+              waterLineY={displayLineY}
               stateFish={stateFish}
               stateClarity={stateClarity}
             />
@@ -852,6 +886,13 @@ Diagnostics:
 
       {isStreaming && (
         <>
+          {isAIActive && lastPrediction && (
+            <AIAnalysisPanel
+              lastPrediction={lastPrediction}
+              lastTurbidityResult={lastTurbidityResult}
+            />
+          )}
+
           <StreamAdjustments
             filters={filters}
             onFilterChange={handleFilterChange}
@@ -863,19 +904,12 @@ Diagnostics:
             </button>
 
             <WaterCalibration
-              waterLineY={activeFeedCalibration?.water_line_y ?? 120}
+              waterLineY={displayLineY}
               isCalibrating={isCalibrating}
               onToggleCalibrating={() => setIsCalibrating(prev => !prev)}
               onUpdateCalibration={updateCalibration}
             />
           </div>
-
-          {isAIActive && lastPrediction && (
-            <AIAnalysisPanel
-              lastPrediction={lastPrediction}
-              lastTurbidityResult={lastTurbidityResult}
-            />
-          )}
         </>
       )}
 
