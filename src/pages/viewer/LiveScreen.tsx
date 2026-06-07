@@ -1,6 +1,8 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useApp } from '../../context/AppContext';
+import { useTank } from '../../hooks/useTank';
+import { useLiveState } from '../../hooks/useLiveState';
+import { useFish } from '../../hooks/useFish';
 import { MockFirestore } from '../../services/mock_service';
 import type { CameraFilters, AIDetectionResult, AITurbidityResult } from '../../types/aquarium';
 
@@ -16,7 +18,9 @@ import { AIAnalysisPanel } from '../../components/live/AIAnalysisPanel';
 import { VideoDecorations } from '../../components/live/VideoDecorations';
 
 export const LiveScreen: React.FC = () => {
-  const { liveState, activeTank, updateCalibration, fishList } = useApp();
+  const { activeTank } = useTank();
+  const { liveState, updateCalibration } = useLiveState(activeTank?.id ?? null);
+  const { fishList } = useFish(activeTank?.id ?? null);
   const [isStreaming, setIsStreaming] = useState(liveState?.is_live || false);
 
   useEffect(() => {

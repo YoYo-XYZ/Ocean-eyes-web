@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
-import { useApp } from '../../context/AppContext';
+import { useTank } from '../../hooks/useTank';
+import { useReadings } from '../../hooks/useReadings';
+import { useFish } from '../../hooks/useFish';
 import { MockFirestore } from '../../services/mock_service';
 import type { AlertItem } from '../../types/aquarium';
 
@@ -8,7 +10,9 @@ interface ScreenProps {
 }
 
 export const ActiveMonitoringScreen: React.FC<ScreenProps> = ({ onNavigate }) => {
-  const { activeTank: contextActiveTank, tanks, readings, fishList } = useApp();
+  const { activeTank: contextActiveTank, tanks } = useTank();
+  const { readings } = useReadings();
+  const { fishList } = useFish(contextActiveTank?.id ?? null);
   const activeTank = contextActiveTank || (tanks.length > 0 ? tanks[0] : null);
   const [simClarityIssue, setSimClarityIssue] = useState(false);
 

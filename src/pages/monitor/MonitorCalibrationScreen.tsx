@@ -1,13 +1,15 @@
 import React, { useState } from 'react';
-import { useApp } from '../../context/AppContext';
+import { useTank } from '../../hooks/useTank';
+import { useLiveState } from '../../hooks/useLiveState';
 
 interface ScreenProps {
   onNavigate: (screen: 'welcome' | 'qr' | 'calibration' | 'active') => void;
 }
 
 export const MonitorCalibrationScreen: React.FC<ScreenProps> = ({ onNavigate }) => {
-  const { activeTank: contextActiveTank, tanks, updateCalibration } = useApp();
+  const { activeTank: contextActiveTank, tanks } = useTank();
   const activeTank = contextActiveTank || (tanks.length > 0 ? tanks[0] : null);
+  const { updateCalibration } = useLiveState(activeTank?.id ?? null);
   const [lineY, setLineY] = useState(activeTank?.calibration?.water_line_y || 120);
   const [saved, setSaved] = useState(false);
   const staticWaterLineY = activeTank?.calibration?.water_line_y || 120; // Static camera feed reference

@@ -17,32 +17,34 @@ export const VideoDecorations: React.FC<VideoDecorationsProps> = ({
 }) => {
   return (
     <>
-      {/* Water Calibration Line Overlay */}
-      <div style={{
-        position: 'absolute',
-        top: `${Math.min(100, Math.max(0, (waterLineY / 240) * 100))}%`,
-        left: 0,
-        width: '100%',
-        height: '2px',
-        borderTop: isCalibrating ? '2px dashed var(--color-critical)' : '2px dashed rgba(255,255,255,0.4)',
-        zIndex: 10,
-        transition: isCalibDragging ? 'none' : 'top 0.1s ease-out'
-      }}>
-        <span style={{
+      {/* Water Calibration Line Overlay — only visible during calibration */}
+      {isCalibrating && (
+        <div style={{
           position: 'absolute',
-          right: '10px',
-          top: '-18px',
-          fontSize: '9px',
-          color: '#FFF',
-          background: isCalibrating ? 'var(--color-critical)' : 'rgba(0,0,0,0.4)',
-          padding: '2px 6px',
-          borderRadius: '4px',
-          fontWeight: 600,
-          boxShadow: isCalibrating ? '0 0 8px rgba(239, 68, 68, 0.5)' : 'none'
+          top: `${Math.min(100, Math.max(0, (waterLineY / 240) * 100))}%`,
+          left: 0,
+          width: '100%',
+          height: '2px',
+          borderTop: '2px dashed var(--color-critical)',
+          zIndex: 10,
+          transition: isCalibDragging ? 'none' : 'top 0.1s ease-out'
         }}>
-          {isCalibrating ? 'DRAG TO CALIBRATE' : 'CALIBRATED LINE'}
-        </span>
-      </div>
+          <span style={{
+            position: 'absolute',
+            right: '10px',
+            top: '-18px',
+            fontSize: '9px',
+            color: '#FFF',
+            background: 'var(--color-critical)',
+            padding: '2px 6px',
+            borderRadius: '4px',
+            fontWeight: 600,
+            boxShadow: '0 0 8px rgba(239, 68, 68, 0.5)'
+          }}>
+            DRAG TO CALIBRATE
+          </span>
+        </div>
+      )}
 
       {/* Bottom-left Telemetry Badges */}
       <div style={{

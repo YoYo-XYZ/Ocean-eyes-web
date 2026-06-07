@@ -1,5 +1,10 @@
 import React, { useState } from 'react';
-import { useApp } from '../../context/AppContext';
+import { useNavigation } from '../../context/NavigationContext';
+import { useTank } from '../../hooks/useTank';
+import { useReadings } from '../../hooks/useReadings';
+import { useFish } from '../../hooks/useFish';
+import { useAlerts } from '../../hooks/useAlerts';
+import { useLiveState } from '../../hooks/useLiveState';
 import { TankHeader } from '../../components/home/TankHeader';
 import { HealthScoreCard } from '../../components/home/HealthScoreCard';
 import { LiveFeedPreview } from '../../components/home/LiveFeedPreview';
@@ -10,21 +15,12 @@ import { ActiveAlertsList } from '../../components/home/ActiveAlertsList';
 import { AddTankModal } from '../../components/home/AddTankModal';
 
 export const HomeScreen: React.FC = () => {
-  const { 
-    activeTank, 
-    readings, 
-    fishList, 
-    alerts, 
-    setActiveTab, 
-    setSelectedAlertId, 
-    liveState, 
-    tanks, 
-    linkedTanks, 
-    tankId, 
-    selectTank, 
-    createAndLinkTank, 
-    linkTank 
-  } = useApp();
+  const { setActiveTab, setSelectedAlertId } = useNavigation();
+  const { activeTank, tanks, linkedTanks, tankId, selectTank, createAndLinkTank, linkTank } = useTank();
+  const { readings } = useReadings();
+  const { fishList } = useFish(tankId);
+  const { alerts } = useAlerts();
+  const { liveState } = useLiveState(tankId);
 
   const [showAddTankModal, setShowAddTankModal] = useState(false);
 

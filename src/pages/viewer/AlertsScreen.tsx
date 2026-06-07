@@ -1,9 +1,11 @@
 import React from 'react';
-import { useApp } from '../../context/AppContext';
+import { useNavigation } from '../../context/NavigationContext';
+import { useAlerts } from '../../hooks/useAlerts';
 import { Check, AlertTriangle } from 'lucide-react';
 
 export const AlertsScreen: React.FC = () => {
-  const { alerts, resolveAlert, setActiveTab, selectedAlertId, setSelectedAlertId } = useApp();
+  const { setActiveTab, selectedAlertId, setSelectedAlertId } = useNavigation();
+  const { alerts, resolveAlert } = useAlerts();
 
   const handleBack = () => {
     setSelectedAlertId(null);

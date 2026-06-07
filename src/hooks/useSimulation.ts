@@ -1,17 +1,16 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { MockFirestore } from '../services/mock_service';
 import { checkClarityAlert, checkFishDiscrepancyAlert } from '../services/alertEngine';
 import { generateSimulatedReading } from '../services/readingSimulator';
-import type { FishEntry, TankBrief } from '../types/aquarium';
+import { useTank } from './useTank';
+import { useFish } from './useFish';
 
-export const useSimulation = (
-  tankId: string | null,
-  fishList: FishEntry[],
-  activeTank: TankBrief | undefined
-) => {
+export const useSimulation = () => {
+  const { tankId, activeTank } = useTank();
+  const { fishList } = useFish(tankId);
   const [simulationActive, setSimulationActive] = useState<boolean>(true);
 
-  const triggerManualReading = () => {
+  const triggerManualReading = useCallback(() => {
     if (!tankId) return;
 
     const totalExpectedFish = fishList.reduce((sum, f) => sum + f.count, 0);
@@ -59,7 +58,7 @@ export const useSimulation = (
         MockFirestore.saveAlerts(newAlerts);
       }
     }
-  };
+  }, [tankId, fishList, activeTank]);
 
   useEffect(() => {
     if (!simulationActive || !tankId) return;
@@ -87,8 +86,7 @@ export const useSimulation = (
     }, 4000);
 
     return () => clearInterval(interval);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [simulationActive, tankId, fishList, activeTank]);
+  }, [simulationActive, tankId, triggerManualReading]);
 
   return {
     simulationActive,
