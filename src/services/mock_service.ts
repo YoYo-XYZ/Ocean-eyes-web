@@ -39,19 +39,19 @@ const SEED_TANKS: TankBrief[] = [
 ];
 
 const SEED_FISH: FishEntry[] = [
-  { id: 'f1', speciesId: 'neon_tetra', name: 'Neon Tetra', imageUrl: 'species-neon-tetra', count: 6, detected: 5 },
-  { id: 'f2', speciesId: 'guppy', name: 'Guppy', imageUrl: 'species-guppy', count: 3, detected: 3 },
-  { id: 'f3', speciesId: 'corydoras', name: 'Corydoras', imageUrl: 'species-corydoras', count: 2, detected: 2 }
+  { id: 'f1', speciesId: 'neon_tetra', name: 'Neon Tetra', imageUrl: 'species-neon-tetra', count: 6, detected: 0 },
+  { id: 'f2', speciesId: 'guppy', name: 'Guppy', imageUrl: 'species-guppy', count: 3, detected: 0 },
+  { id: 'f3', speciesId: 'corydoras', name: 'Corydoras', imageUrl: 'species-corydoras', count: 2, detected: 0 }
 ];
 
 const SEED_READINGS: ReadingItem[] = [
-  { id: 'r7', tank_id: 'living-room-tank-77', timestamp: new Date(Date.now() - 60000 * 2).toISOString(), clarity: 1.2, fish_count: 10, fish_count_confidence: 0.95, frame_url: '', ph: 7.2, temp: 26.1, ammonia: 0.0, nitrite: 0.1 },
-  { id: 'r6', tank_id: 'living-room-tank-77', timestamp: new Date(Date.now() - 3600000 * 1).toISOString(), clarity: 1.0, fish_count: 10, fish_count_confidence: 0.98, frame_url: '', ph: 7.2, temp: 26.0, ammonia: 0.0, nitrite: 0.1 },
-  { id: 'r5', tank_id: 'living-room-tank-77', timestamp: new Date(Date.now() - 3600000 * 2).toISOString(), clarity: 1.5, fish_count: 9, fish_count_confidence: 0.88, frame_url: '', ph: 7.3, temp: 25.9, ammonia: 0.01, nitrite: 0.1 },
-  { id: 'r4', tank_id: 'living-room-tank-77', timestamp: new Date(Date.now() - 3600000 * 5).toISOString(), clarity: 0.8, fish_count: 11, fish_count_confidence: 0.92, frame_url: '', ph: 7.1, temp: 26.2, ammonia: 0.0, nitrite: 0.08 },
-  { id: 'r3', tank_id: 'living-room-tank-77', timestamp: new Date(Date.now() - 3600000 * 12).toISOString(), clarity: 0.5, fish_count: 11, fish_count_confidence: 0.95, frame_url: '', ph: 7.2, temp: 26.1, ammonia: 0.0, nitrite: 0.07 },
-  { id: 'r2', tank_id: 'living-room-tank-77', timestamp: new Date(Date.now() - 86400000 * 1).toISOString(), clarity: 0.4, fish_count: 11, fish_count_confidence: 0.97, frame_url: '', ph: 7.2, temp: 26.1, ammonia: 0.0, nitrite: 0.05 },
-  { id: 'r1', tank_id: 'living-room-tank-77', timestamp: new Date(Date.now() - 86400000 * 2).toISOString(), clarity: 0.3, fish_count: 11, fish_count_confidence: 0.96, frame_url: '', ph: 7.2, temp: 25.8, ammonia: 0.0, nitrite: 0.05 }
+  { id: 'r7', tank_id: 'living-room-tank-77', timestamp: new Date(Date.now() - 60000 * 2).toISOString(), clarity: 1.2, fish_count: 0, fish_count_confidence: 0.95, frame_url: '', ph: 7.2, temp: 26.1, ammonia: 0.0, nitrite: 0.1 },
+  { id: 'r6', tank_id: 'living-room-tank-77', timestamp: new Date(Date.now() - 3600000 * 1).toISOString(), clarity: 1.0, fish_count: 0, fish_count_confidence: 0.98, frame_url: '', ph: 7.2, temp: 26.0, ammonia: 0.0, nitrite: 0.1 },
+  { id: 'r5', tank_id: 'living-room-tank-77', timestamp: new Date(Date.now() - 3600000 * 2).toISOString(), clarity: 1.5, fish_count: 0, fish_count_confidence: 0.88, frame_url: '', ph: 7.3, temp: 25.9, ammonia: 0.01, nitrite: 0.1 },
+  { id: 'r4', tank_id: 'living-room-tank-77', timestamp: new Date(Date.now() - 3600000 * 5).toISOString(), clarity: 0.8, fish_count: 0, fish_count_confidence: 0.92, frame_url: '', ph: 7.1, temp: 26.2, ammonia: 0.0, nitrite: 0.08 },
+  { id: 'r3', tank_id: 'living-room-tank-77', timestamp: new Date(Date.now() - 3600000 * 12).toISOString(), clarity: 0.5, fish_count: 0, fish_count_confidence: 0.95, frame_url: '', ph: 7.2, temp: 26.1, ammonia: 0.0, nitrite: 0.07 },
+  { id: 'r2', tank_id: 'living-room-tank-77', timestamp: new Date(Date.now() - 86400000 * 1).toISOString(), clarity: 0.4, fish_count: 0, fish_count_confidence: 0.97, frame_url: '', ph: 7.2, temp: 26.1, ammonia: 0.0, nitrite: 0.05 },
+  { id: 'r1', tank_id: 'living-room-tank-77', timestamp: new Date(Date.now() - 86400000 * 2).toISOString(), clarity: 0.3, fish_count: 0, fish_count_confidence: 0.96, frame_url: '', ph: 7.2, temp: 25.8, ammonia: 0.0, nitrite: 0.05 }
 ];
 
 const SEED_ALERTS: AlertItem[] = [
@@ -166,7 +166,7 @@ export class MockFirestore {
       started_at: null,
       last_ping_at: null,
       current_clarity: 1.2,
-      current_fish_count: 10,
+      current_fish_count: 0,
       selected_feed_id: 'feed-main',
       feeds: [
         {
@@ -176,7 +176,7 @@ export class MockFirestore {
           is_live: false,
           started_at: null,
           current_clarity: 1.2,
-          current_fish_count: 10,
+          current_fish_count: 0,
           mock_image: '/mock_camera_main.png'
         }
       ]

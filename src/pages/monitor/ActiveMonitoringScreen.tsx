@@ -11,19 +11,18 @@ export const ActiveMonitoringScreen: React.FC<ScreenProps> = ({ onNavigate }) =>
   const { activeTank: contextActiveTank, tanks, readings, fishList } = useApp();
   const activeTank = contextActiveTank || (tanks.length > 0 ? tanks[0] : null);
   const [simClarityIssue, setSimClarityIssue] = useState(false);
-  const [simFishHiding, setSimFishHiding] = useState(false);
 
   const latestReading = readings[0] || {
     clarity: 1.2,
-    fish_count: 10,
+    fish_count: 0,
     ph: 7.2,
     temp: 26.1
   };
 
   // Modulate local metrics scan trigger with simulations
   const displayClarity = simClarityIssue ? 8.5 : latestReading.clarity;
+  const displayFish = latestReading.fish_count;
   const totalFish = fishList.reduce((sum, f) => sum + f.count, 0);
-  const displayFish = simFishHiding ? Math.round(totalFish * 0.4) : latestReading.fish_count;
 
   // Background mock state write
   const triggerSimulationMetrics = () => {
@@ -63,28 +62,7 @@ export const ActiveMonitoringScreen: React.FC<ScreenProps> = ({ onNavigate }) =>
       }
     }
 
-    if (simFishHiding) {
-      const activeAlerts = MockFirestore.getAlerts();
-      const existing = activeAlerts.find((a: AlertItem) => !a.resolved && a.title.includes('visible'));
-      if (!existing) {
-        const newAlerts = [...activeAlerts];
-        newAlerts.unshift({
-          id: `alert-f-${Date.now()}`,
-          title: `Only ${displayFish} of ${totalFish} fish visible`,
-          message: `Fish visibility falls under ${activeTank.thresholds.fish_change_pct}% threshold. Check for distress.`,
-          tip: 'Fish may be hiding behind plants or decor due to light changes or stressors. Confirm filter is running and test water chemistry.',
-          severity: 'critical',
-          timeAgo: 'Just now',
-          clarityBefore: displayClarity.toString(),
-          clarityAfter: displayClarity.toString(),
-          fishBefore: totalFish.toString(),
-          fishAfter: displayFish.toString(),
-          resolved: false,
-          timestamp: new Date().toISOString()
-        });
-        MockFirestore.saveAlerts(newAlerts);
-      }
-    }
+
   };
 
   const waterHeightPct = activeTank?.calibration ? Math.min(100, Math.max(0, ((240 - activeTank.calibration.water_line_y) / 240) * 100)) : 50;
@@ -151,10 +129,6 @@ export const ActiveMonitoringScreen: React.FC<ScreenProps> = ({ onNavigate }) =>
           pointerEvents: 'none'
         }} />
 
-        {/* Aquatic Plants */}
-        <div style={{ position: 'absolute', bottom: '18px', left: '5%', fontSize: '24px', zIndex: 3, opacity: 0.7 }} className="anim-float-1">🌿</div>
-        <div style={{ position: 'absolute', bottom: '18px', right: '8%', fontSize: '28px', zIndex: 3, opacity: 0.6 }} className="anim-float-2">🍀</div>
-
         {/* Glass Tank Frame Reflection */}
         <div style={{
           position: 'absolute',
@@ -217,19 +191,6 @@ export const ActiveMonitoringScreen: React.FC<ScreenProps> = ({ onNavigate }) =>
           </span>
         </div>
 
-        {/* Swimming fish inside canvas */}
-        {!simFishHiding ? (
-          <div style={{ zIndex: 5, position: 'absolute', width: '100%', height: '100%', pointerEvents: 'none' }}>
-            <span style={{ fontSize: '32px', position: 'absolute', top: '35%', left: '30%' }} className="anim-float-1">🐟</span>
-            <span style={{ fontSize: '28px', position: 'absolute', top: '55%', right: '25%' }} className="anim-float-2">🐠</span>
-            <span style={{ fontSize: '36px', position: 'absolute', bottom: '30%', left: '40%' }} className="anim-float-2">🐡</span>
-          </div>
-        ) : (
-          <div style={{ zIndex: 5, position: 'absolute', width: '100%', height: '100%', pointerEvents: 'none' }}>
-            <span style={{ fontSize: '28px', position: 'absolute', top: '55%', right: '25%' }} className="anim-float-2">🐠</span>
-          </div>
-        )}
-
         {/* Dynamic Water Line Calibration Overlay */}
         {activeTank?.calibration && (
           <div style={{
@@ -283,24 +244,7 @@ export const ActiveMonitoringScreen: React.FC<ScreenProps> = ({ onNavigate }) =>
             {simClarityIssue ? 'Restore Clarity' : 'Trigger Clog Filter'}
           </button>
 
-          <button 
-            style={{
-              padding: '8px 10px',
-              fontSize: '11px',
-              borderRadius: '8px',
-              border: 'none',
-              fontWeight: 600,
-              cursor: 'pointer',
-              backgroundColor: simFishHiding ? 'var(--color-critical)' : '#1E293B',
-              color: '#FFF'
-            }}
-            onClick={() => {
-              setSimFishHiding(prev => !prev);
-              setTimeout(triggerSimulationMetrics, 50);
-            }}
-          >
-            {simFishHiding ? 'Restore Fish' : 'Trigger Fish Hiding'}
-          </button>
+          {/* Fish hiding simulation removed — AI detection is the sole source of truth */}
         </div>
       </div>
 
